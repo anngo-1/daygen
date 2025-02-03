@@ -7,6 +7,9 @@
 ## Overview
 daygen is a backtesting platform for algorithmic day trading strategies, featuring a C++ backend for strategy execution and a Next.js dashboard for visualization. The project currently implements a MACD-based trading strategy with plans to add more in the future.
 
+It is deployed on vercel here: ![link](daygen.vercel.app)
+
+
 ## Features
 - Market data fetching from Yahoo Finance (yfinance Python library)
 - Trading strategies implemented in C++ (more to come soon), served on a C++ backend
@@ -21,11 +24,13 @@ daygen is a backtesting platform for algorithmic day trading strategies, featuri
 - HTTP server using cpp-httplib for REST API endpoints
 - JSON processing with nlohmann/json
 - Python integration using system calls for yfinance data fetching
+- Runs on an AWS EC2 instance
 
 ### Frontend (Next.js)
 - React with TypeScript
 - Mantine UI library
 - Chart.js for visualization
+- Hosted on vercel
 
 ## Getting Started
 

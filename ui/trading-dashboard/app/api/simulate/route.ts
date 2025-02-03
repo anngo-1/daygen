@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const cleanParams = Object.fromEntries(
-      Object.entries(params).filter(([_, value]) => value !== null)
+      Object.entries(params).filter(([value]) => value !== null)
     ) as Record<string, string>;
 
     const response = await fetch(

@@ -1,5 +1,6 @@
 # daygen
-![image](https://github.com/user-attachments/assets/02acbb40-108d-49e8-8088-ff9cfecb400b)
+![image](https://github.com/user-attachments/assets/0e6426b4-ae06-4029-ab30-f35f97eacdc5)
+
 
 ⚠️ **DISCLAIMER: This is a hobby project for learning C++, exploring trading concepts, implementing silly strategies, and practicing mathematical modeling. It is NOT intended for real trading or investment advice.**
 

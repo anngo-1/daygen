@@ -342,6 +342,7 @@ export function TradingChart({ data }: TradingChartProps) {
               <div>
                 <MantineTitle order={2} size="h3">Trading Performance</MantineTitle>
                 <Text c="dimmed" size="sm">Strategy: {data.strategy}</Text>
+                <Text c="dimmed" size="sm">0.1% fee taken from each transaction</Text>
               </div>
 
               <Group gap="xs" wrap="nowrap">

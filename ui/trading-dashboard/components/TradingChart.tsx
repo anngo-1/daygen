@@ -1,4 +1,4 @@
-import React, { useState, useRef, ReactElement, ReactNode, useMemo } from 'react';
+import React, { useState, useRef, ReactElement, ReactNode, useMemo, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -26,7 +26,7 @@ import {
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';
-import { Text, Group, Stack, Tabs, Card, Title as MantineTitle, RingProgress, Grid } from '@mantine/core';
+import { Text, Group, Stack, Tabs, Title as MantineTitle, RingProgress, Grid, Box } from '@mantine/core'; // Removed Card import, added Box
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { TradingData, HistoricalDataPoint } from '../types/types';
@@ -97,7 +97,7 @@ interface EnrichedDataPoint extends HistoricalDataPoint {
 }
 
 const StatCard = ({ title, value, subtitle, icon, color }: StatCardProps) => (
-  <Card withBorder p="md" radius="md" className="h-full" style={{ borderWidth: '2px' }}>
+  <Box p="md" className="h-full" style={{ borderWidth: '2px', border: '1px solid #e0e0e0', borderRadius: '8px' }}> 
     <Group gap="sm" align="flex-start" wrap="nowrap">
       {icon}
       <div className="min-w-0">
@@ -106,12 +106,24 @@ const StatCard = ({ title, value, subtitle, icon, color }: StatCardProps) => (
         <Text size="xs" c={color} fw={600} truncate>{subtitle}</Text>
       </div>
     </Group>
-  </Card>
+  </Box>
 );
 
 export function TradingChart({ data }: TradingChartProps) {
   const [activeTab, setActiveTab] = useState<string | null>('performance');
   const chartRef = useRef<Chart<'line'> | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768); // Adjust breakpoint as needed
+    };
+
+    handleResize(); // Initial check
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 
   const percentageChange = ((data.profit_loss / data.initial_capital) * 100).toFixed(2);
   const isProfit = data.profit_loss >= 0;
@@ -146,17 +158,19 @@ export function TradingChart({ data }: TradingChartProps) {
           autoSkipPadding: 50,
           maxRotation: 0,
           minRotation: 0,
+          display: !isMobile, // Hide x axis ticks on mobile
         },
-        grid: { display: false },
+        grid: { display: !isMobile }, // Hide x axis grid on mobile
       },
       y: {
         type: 'linear',
         position: 'left',
         ticks: {
           callback: yAxisTicksCallback,
-          padding: 10
+          padding: 10,
+          display: !isMobile, // Hide y axis ticks on mobile
         },
-        grid: { color: '#ced4da' },
+        grid: { color: isMobile ? 'transparent' : '#ced4da', display: !isMobile }, // Hide y axis grid on mobile, make grid transparent to hide line
       },
     },
     elements: { line: { tension: 0.4, borderWidth: 2 }, point: { radius: 0, hitRadius: 10 } },
@@ -284,57 +298,117 @@ export function TradingChart({ data }: TradingChartProps) {
       maxDeviation = Math.max(maxDeviation, Math.abs(value - baseline));
     });
 
-    const yAxisMin = baseline - maxDeviation * 1.1; 
+    const yAxisMin = baseline - maxDeviation * 1.1;
     const yAxisMax = baseline + maxDeviation * 1.1;
 
     return {
       ...chartOptionsBase,
       plugins: { ...chartOptionsBase.plugins, ...tradeAnnotations },
       scales: {
-        ...chartOptionsBase.scales!,
+        ...(chartOptionsBase.scales || {}), // Provide default empty object if scales is undefined
+        x: {
+          ...(chartOptionsBase.scales?.x || {}), // Provide default empty object if x scale is undefined
+          type: 'category', // Ensure type is defined here as well, if it was intended from base
+          ticks: {
+            ...(chartOptionsBase.scales?.x?.ticks || {}), // Optional chaining for ticks
+            callback: xAxisTicksCallback,
+            autoSkipPadding: 50,
+            maxRotation: 0,
+            minRotation: 0,
+            display: !isMobile,
+          },
+          grid: {
+            ...(chartOptionsBase.scales?.x?.grid || {}), // Optional chaining for grid
+            display: !isMobile,
+          },
+        },
         y: {
-          ...chartOptionsBase.scales!.y,
-          title: { display: true, text: 'Portfolio Value ($)', align: 'end' },
+          ...(chartOptionsBase.scales?.y || {}), // Provide default empty object if y scale is undefined
+          type: 'linear', // Ensure type is defined here as well, if it was intended from base
+          position: 'left',
+          title: { ...(chartOptionsBase.scales?.y?.title || {}), display: !isMobile, text: 'Portfolio Value ($)', align: 'end' }, // Optional chaining for title
           min: yAxisMin,
           max: yAxisMax,
+          ticks: {
+            ...(chartOptionsBase.scales?.y?.ticks || {}), // Optional chaining for ticks
+            callback: yAxisTicksCallback,
+            padding: 10,
+            display: !isMobile,
+          },
+          grid: {
+            ...(chartOptionsBase.scales?.y?.grid || {}), // Optional chaining for grid
+            color: isMobile ? 'transparent' : '#ced4da',
+            display: !isMobile,
+          },
         },
-      },
+      } as ChartOptions<'line'>['scales'], // Type assertion to help TS understand the structure
     };
-  }, [data, portfolioValues, tradeAnnotations, chartOptionsBase]);
+  }, [data, portfolioValues, tradeAnnotations, chartOptionsBase, isMobile, xAxisTicksCallback, yAxisTicksCallback]);
 
 
   const priceChartOptions: ChartOptions<'line'> = useMemo(() => {
-    const baseline = enrichedData[0]?.price || 0; // use first price as baseline for price chart, or 0 if no data
+    const baseline = enrichedData[0]?.price || 0;
     let maxDeviation = 0;
     priceValues.forEach(value => {
       maxDeviation = Math.max(maxDeviation, Math.abs(value - baseline));
     });
 
-    const yAxisMin = baseline === 0 ? 0 : baseline - maxDeviation * 1.1; // adjust min if baseline is 0
+    const yAxisMin = baseline === 0 ? 0 : baseline - maxDeviation * 1.1;
     const yAxisMax = baseline + maxDeviation * 1.1;
 
     return {
       ...chartOptionsBase,
       plugins: { ...chartOptionsBase.plugins, ...tradeAnnotations },
       scales: {
-        ...chartOptionsBase.scales!,
+        ...(chartOptionsBase.scales || {}), // Provide default empty object if scales is undefined
+        x: {
+          ...(chartOptionsBase.scales?.x || {}), // Provide default empty object if x scale is undefined
+          type: 'category', // Ensure type is defined here as well, if it was intended from base
+          ticks: {
+            ...(chartOptionsBase.scales?.x?.ticks || {}), // Optional chaining for ticks
+            callback: xAxisTicksCallback,
+            autoSkipPadding: 50,
+            maxRotation: 0,
+            minRotation: 0,
+            display: !isMobile,
+          },
+          grid: {
+            ...(chartOptionsBase.scales?.x?.grid || {}), // Optional chaining for grid
+            display: !isMobile,
+          },
+        },
         y: {
-          ...chartOptionsBase.scales!.y,
-          title: { display: true, text: 'Price ($)', align: 'end' },
+          ...(chartOptionsBase.scales?.y || {}), // Provide default empty object if y scale is undefined
+          type: 'linear', // Ensure type is defined here as well, if it was intended from base
+          position: 'left',
+          title: { ...(chartOptionsBase.scales?.y?.title || {}), display: !isMobile, text: 'Price ($)', align: 'end' }, // Optional chaining for title
           min: yAxisMin,
           max: yAxisMax,
+          ticks: {
+            ...(chartOptionsBase.scales?.y?.ticks || {}), // Optional chaining for ticks
+            callback: yAxisTicksCallback,
+            padding: 10,
+            display: !isMobile,
+          },
+          grid: {
+            ...(chartOptionsBase.scales?.y?.grid || {}), // Optional chaining for grid
+            color: isMobile ? 'transparent' : '#ced4da',
+            display: !isMobile,
+          },
         },
-      },
+      } as ChartOptions<'line'>['scales'], // Type assertion to help TS understand the structure
     };
-  }, [chartOptionsBase, priceValues, tradeAnnotations, enrichedData]);
+  }, [chartOptionsBase, priceValues, tradeAnnotations, enrichedData, isMobile, xAxisTicksCallback, yAxisTicksCallback]);
 
 
   return (
     <Stack gap="xl">
-      <Card withBorder shadow="md" p="md" radius="md" style={{
+      <Box  p="md" style={{  // Replaced Card with Box for the top section
         borderWidth: '2px',
         borderColor: isProfit ? 'var(--mantine-color-green-4)' : 'var(--mantine-color-red-4)',
-        background: 'linear-gradient(to right, white, var(--mantine-color-gray-0))'
+        background: 'linear-gradient(to right, white, var(--mantine-color-gray-0))',
+        borderRadius: '8px', // Added border radius back for the top section
+        padding: '20px' // Added padding back for the top section
       }}>
         <Grid gutter="xl">
           <Grid.Col span={{ base: 12, md: 4 }}>
@@ -405,9 +479,9 @@ export function TradingChart({ data }: TradingChartProps) {
             </Grid>
           </Grid.Col>
         </Grid>
-      </Card>
+      </Box>
 
-      <Card withBorder shadow="sm" style={{ borderWidth: '2px' }}>
+      <Box style={{ /*borderWidth: '2px', border: '1px solid #e0e0e0', borderRadius: '8px', */ marginTop: '20px' }}> {/* Removed Card, added Box, removed border for simplicity but kept marginTop*/}
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List grow>
             <Tabs.Tab value="performance" fw={500}>Portfolio Analysis</Tabs.Tab>
@@ -427,7 +501,7 @@ export function TradingChart({ data }: TradingChartProps) {
             )}
           </div>
         </Tabs>
-      </Card>
+      </Box>
     </Stack>
   );
 }

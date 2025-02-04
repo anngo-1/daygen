@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Badge, Text, Group, Pagination } from '@mantine/core';
+import { Table, Badge, Text, Group, Pagination, ScrollArea } from '@mantine/core'; // Import ScrollArea
 import { Trade, HistoricalDataPoint } from '../types/types';
 import React from 'react';
 
@@ -37,6 +37,7 @@ export function TradeHistory({ trades, historicalData }: TradeHistoryProps) {
           <Badge
             color={trade.side.includes('BUY') ? 'green' : 'red'}
             variant="light"
+            style={{ minWidth: '60px', display: 'inline-block', textAlign: 'center' }} // Added style for mobile badge
           >
             {trade.side}
           </Badge>
@@ -53,38 +54,40 @@ export function TradeHistory({ trades, historicalData }: TradeHistoryProps) {
 
   return (
     <>
-      <Table striped highlightOnHover>
-        <Table.Caption>
-          <Group justify="space-between">
-            <Text fw={500} fz="lg">Trade History</Text>
-            <Text fz="sm" color="dimmed">Total Trades: {trades.length}</Text>
-          </Group>
-        </Table.Caption>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Time</Table.Th>
-            <Table.Th>Side</Table.Th>
-            <Table.Th ta="right">Price</Table.Th>
-            <Table.Th ta="right">Quantity</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {paginatedTrades.length > 0 ? rows : (
+      <ScrollArea> 
+        <Table striped highlightOnHover>
+          <Table.Caption>
+            <Group justify="space-between">
+              <Text fw={500} fz="lg">Trade History</Text>
+              <Text fz="sm" color="dimmed">Total Trades: {trades.length}</Text>
+            </Group>
+          </Table.Caption>
+          <Table.Thead>
             <Table.Tr>
-              <Table.Td colSpan={4} ta="center"> {/* Changed colSpan to 4 */}
-                <Text fz="sm" color="dimmed">No trades executed during this simulation.</Text>
-              </Table.Td>
+              <Table.Th>Time</Table.Th>
+              <Table.Th>Side</Table.Th>
+              <Table.Th ta="right">Price</Table.Th>
+              <Table.Th ta="right">Quantity</Table.Th>
             </Table.Tr>
-          )}
-        </Table.Tbody>
-        <Table.Tfoot>
-          <Table.Tr>
-            <Table.Th colSpan={4} ta="right"> {/* Changed colSpan to 4 */}
-              <Text fz="sm" color="dimmed">End of Trade History</Text>
-            </Table.Th>
-          </Table.Tr>
-        </Table.Tfoot>
-      </Table>
+          </Table.Thead>
+          <Table.Tbody>
+            {paginatedTrades.length > 0 ? rows : (
+              <Table.Tr>
+                <Table.Td colSpan={4} ta="center">
+                  <Text fz="sm" color="dimmed">No trades executed during this simulation.</Text>
+                </Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+          <Table.Tfoot>
+            <Table.Tr>
+              <Table.Th colSpan={4} ta="right">
+                <Text fz="sm" color="dimmed">End of Trade History</Text>
+              </Table.Th>
+            </Table.Tr>
+          </Table.Tfoot>
+        </Table>
+      </ScrollArea>
       {trades.length > tradesPerPage && (
         <Pagination
           value={activePage}

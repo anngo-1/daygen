@@ -219,7 +219,7 @@ export function TradingDashboard() {
     }
   }, [error]);
 
-  const maxDate = dayjs().subtract(1, 'day').toDate();
+
   const minDate = dayjs().subtract(60, 'days').toDate();
 
   return (
@@ -286,7 +286,6 @@ export function TradingDashboard() {
                         placeholder="Select date"
                         value={date}
                         onChange={(value: Date | null) => value && setDate(value)}
-                        maxDate={maxDate}
                         minDate={minDate}
                       />
                     ) : (
@@ -296,7 +295,6 @@ export function TradingDashboard() {
                         placeholder="Select dates"
                         value={dateRange}
                         onChange={(value: [Date | null, Date | null]) => setDateRange(value)}
-                        maxDate={maxDate}
                         minDate={minDate}
                       />
                     )}
@@ -350,7 +348,7 @@ export function TradingDashboard() {
 
             {currentError && (
               <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
-                <Text c="red.7" fw={500}>No Data returned - Check Stock Ticker or Change Date</Text>
+                <Text c="red.7" fw={500}>No data returned - Check Stock Ticker or Change Date</Text>
               </Paper>
             )}
 

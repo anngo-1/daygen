@@ -1,7 +1,13 @@
-'use client'
+// app/layout.tsx
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
-import { MantineProvider } from '@mantine/core';
+import ClientLayout from './client-layout';
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
 
 export default function RootLayout({
   children,
@@ -11,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <MantineProvider>{children}</MantineProvider>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

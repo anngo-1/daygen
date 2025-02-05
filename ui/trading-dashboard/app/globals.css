@@ -1,3 +1,4 @@
+/* globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,6 +6,17 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+/* Prevent zoom interactions but keep text sizing */
+html, body {
+  touch-action: pan-x pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent double-tap zoom */
+* { 
+  touch-action: manipulation;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -19,7 +19,8 @@ def fetch_yfinance_data(symbol, interval, date):
             interval=interval,
             start=start_date,
             end=end_date,
-            progress=False
+            progress=False,
+            auto_adjust=True
         )
         
         if data.empty:

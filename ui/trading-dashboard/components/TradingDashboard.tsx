@@ -148,6 +148,9 @@ const STRATEGIES: StrategyOption[] = [
 
 function getLastWeekday(): Date {
   const today = dayjs();
+  if (today.day() >= 1 && today.day() <= 5) {
+    return today.toDate();
+  }
   let date = today;
   while (date.day() === 0 || date.day() === 6) {
     date = date.subtract(1, 'day');
@@ -158,10 +161,11 @@ function getLastWeekday(): Date {
 export function TradingDashboard() {
   const [symbol, setSymbol] = useState<string>('AAPL');
   const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
-  const [date, setDate] = useState<Date>(dayjs('2025-01-31').toDate());
+  const todayOrLastWeekday = getLastWeekday();
+  const [date, setDate] = useState<Date>(todayOrLastWeekday);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-    dayjs().subtract(7, 'days').toDate(),
-    getLastWeekday()
+    dayjs(todayOrLastWeekday).subtract(7, 'days').toDate(),
+    todayOrLastWeekday
   ]);
   const [interval, setInterval] = useState<string>('5m');
   const [strategy, setStrategy] = useState<string>('macd');
@@ -188,17 +192,17 @@ export function TradingDashboard() {
         strategy,
         days,
         startDate: '',
-        endDate: '',   
+        endDate: '',
         initial_capital: initialCapital,
       });
     } else {
       if (!dateRange[0] || !dateRange[1]) return;
       runSimulation({
         symbol,
-        date: '',     
+        date: '',
         interval,
         strategy,
-        days: 1,      
+        days: 1,
         startDate: dayjs(dateRange[0]).format('YYYY-MM-DD'),
         endDate: dayjs(dateRange[1]).format('YYYY-MM-DD'),
         initial_capital: initialCapital,
@@ -244,7 +248,7 @@ export function TradingDashboard() {
                 <SegmentedControl
                   fullWidth
                   value={dateMode}
-                                      onChange={(value) => setDateMode(value as 'single' | 'range')}
+                  onChange={(value) => setDateMode(value as 'single' | 'range')}
                   data={[
                     { label: 'Single Date + Days', value: 'single' },
                     { label: 'Date Range', value: 'range' },

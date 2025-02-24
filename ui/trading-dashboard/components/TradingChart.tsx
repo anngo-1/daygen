@@ -23,13 +23,37 @@ import {
   ChartData,
   Chart,
   TooltipItem,
+  ScriptableTooltipContext,
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';
-import { Text, Group, Stack, Tabs, Title as MantineTitle, RingProgress, Grid, Box } from '@mantine/core'; // Removed Card import, added Box
+import { Text, Group, Stack, Tabs, Title as MantineTitle, RingProgress, Grid, Box } from '@mantine/core';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { TradingData, HistoricalDataPoint } from '../types/types';
+
+const customDrawPlugin = {
+  id: 'customDraw',
+  beforeTooltipDraw: (chart: Chart) => {
+    const activeElements = chart.getActiveElements();
+    if (activeElements && activeElements.length > 0) {
+      const activePoint = activeElements[0];
+      const { ctx } = chart;
+      const x = activePoint.element.x;
+      const topY = chart.scales.y.top;
+      const bottomY = chart.scales.y.bottom;
+      
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, topY);
+      ctx.lineTo(x, bottomY);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+};
 
 ChartJS.register(
   annotationPlugin,
@@ -50,7 +74,8 @@ ChartJS.register(
   Title,
   ChartTooltip,
   Legend,
-  Filler
+  Filler,
+  customDrawPlugin
 );
 
 interface TradingChartProps {
@@ -91,9 +116,11 @@ interface TradeAnnotation {
   };
 }
 
-
 interface EnrichedDataPoint extends HistoricalDataPoint {
   baseline: number;
+  profit?: number;
+  profitPercentage?: number;
+  date?: string;
 }
 
 const StatCard = ({ title, value, subtitle, icon, color }: StatCardProps) => (
@@ -109,6 +136,23 @@ const StatCard = ({ title, value, subtitle, icon, color }: StatCardProps) => (
   </Box>
 );
 
+const addCustomStyles = () => {
+  const style = document.createElement('style');
+  style.textContent = `
+    .chart-container .chartjs-tooltip {
+      opacity: 0.95 !important;
+      background: rgba(33, 37, 41, 0.8) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      letter-spacing: normal !important;
+      pointer-events: none !important;
+      z-index: 20 !important;
+      max-width: 220px !important;
+    }
+  `;
+  document.head.appendChild(style);
+};
+
 export function TradingChart({ data }: TradingChartProps) {
   const [activeTab, setActiveTab] = useState<string | null>('performance');
   const chartRef = useRef<Chart<'line'> | null>(null);
@@ -116,14 +160,15 @@ export function TradingChart({ data }: TradingChartProps) {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768); // Adjust breakpoint as needed
+      setIsMobile(window.innerWidth < 768);
     };
 
-    handleResize(); // Initial check
+    handleResize();
     window.addEventListener('resize', handleResize);
+    addCustomStyles();
+    
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
 
   const percentageChange = ((data.profit_loss / data.initial_capital) * 100).toFixed(2);
   const isProfit = data.profit_loss >= 0;
@@ -135,11 +180,24 @@ export function TradingChart({ data }: TradingChartProps) {
   const highestTime = data.historical_data.find(d => d.indicators.portfolio_value === highestValue)?.timestamp;
   const lowestTime = data.historical_data.find(d => d.indicators.portfolio_value === lowestValue)?.timestamp;
 
-  const enrichedData: EnrichedDataPoint[] = data.historical_data.map(point => ({ ...point, baseline: data.initial_capital }));
+  const enrichedData: EnrichedDataPoint[] = data.historical_data.map(point => {
+    const profit = point.indicators.portfolio_value - data.initial_capital;
+    const profitPercentage = (profit / data.initial_capital) * 100;
+    const date = dayjs(point.timestamp).format('MMM D, YYYY HH:mm:ss');
+    
+    return {
+      ...point,
+      baseline: data.initial_capital,
+      profit,
+      profitPercentage,
+      date
+    };
+  });
 
   const xAxisTicksCallback = (tickValue: string | number): string => {
     const indexValue = typeof tickValue === 'string' ? parseInt(tickValue, 10) : tickValue;
-    return dayjs(enrichedData?.[indexValue]?.timestamp).format('HH:mm') || '';
+    const timestamp = enrichedData[indexValue]?.timestamp;
+    return timestamp ? dayjs(timestamp).format('HH:mm') : '';
   };
 
   const yAxisTicksCallback = (tickValue: string | number): string => {
@@ -158,9 +216,9 @@ export function TradingChart({ data }: TradingChartProps) {
           autoSkipPadding: 50,
           maxRotation: 0,
           minRotation: 0,
-          display: !isMobile, // Hide x axis ticks on mobile
+          display: !isMobile,
         },
-        grid: { display: !isMobile }, // Hide x axis grid on mobile
+        grid: { display: !isMobile },
       },
       y: {
         type: 'linear',
@@ -168,12 +226,22 @@ export function TradingChart({ data }: TradingChartProps) {
         ticks: {
           callback: yAxisTicksCallback,
           padding: 10,
-          display: !isMobile, // Hide y axis ticks on mobile
+          display: !isMobile,
         },
-        grid: { color: isMobile ? 'transparent' : '#ced4da', display: !isMobile }, // Hide y axis grid on mobile, make grid transparent to hide line
+        grid: { color: isMobile ? 'transparent' : '#ced4da', display: !isMobile },
       },
     },
-    elements: { line: { tension: 0.4, borderWidth: 2 }, point: { radius: 0, hitRadius: 10 } },
+    elements: { 
+      line: { tension: 0.4, borderWidth: 2 }, 
+      point: { 
+        radius: 0, 
+        hitRadius: 10,
+        hoverRadius: 6,
+        hoverBackgroundColor: 'white',  
+        hoverBorderColor: '#228be6',
+        hoverBorderWidth: 2,
+      } 
+    },
     plugins: {
       legend: { display: false },
       title: { display: false },
@@ -181,51 +249,84 @@ export function TradingChart({ data }: TradingChartProps) {
         enabled: true,
         mode: 'index',
         intersect: false,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderColor: '#6c757d',
+        position: 'nearest',
+        yAlign: 'bottom',
+        xAlign: 'center',
+        backgroundColor: 'rgba(33, 37, 41, 0.8)',
+        titleColor: '#ffffff',
+        bodyColor: '#ffffff',
+        borderColor: '#adb5bd',
         borderWidth: 1,
-        padding: 12,
+        padding: 10,
         boxPadding: 6,
+        cornerRadius: 4,
         titleFont: { weight: 'bold', size: 14 },
-        bodyFont: { weight: 'normal', size: 14 },
+        bodyFont: { weight: 'normal', size: 13 },
+        caretSize: 6,
+        caretPadding: 6,
+        displayColors: false,
+        usePointStyle: true,
+        boxWidth: 0,
         callbacks: {
           label: (context: TooltipItem<'line'>) => {
-            const label = context.dataset.label || '';
+            const datasetLabel = context.dataset.label || '';
             const value = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
-            return `${label}: ${value}`;
+            
+            if (datasetLabel === 'Portfolio Value') {
+              const point = enrichedData[context.dataIndex];
+              const isProfit = (point.profit || 0) > 0;
+              return `${datasetLabel}: ${value}${isProfit ? ' ▲' : ' ▼'}`;
+            }
+            
+            return `${datasetLabel}: ${value}`;
           },
-          title: (tooltipItems: TooltipItem<'line'>[]) =>
-            dayjs(tooltipItems[0].label).format('MMM D, YYYY HH:mm:ss'),
+          title: (tooltipItems: TooltipItem<'line'>[]) => {
+            const index = tooltipItems[0].dataIndex;
+            return enrichedData[index]?.date || '';
+          },
           afterLabel: (context: TooltipItem<'line'>) => {
             const dataIndex = context.dataIndex;
             const point = enrichedData[dataIndex];
-            if (point.trade) {
-              const trade = point.trade;
-              return [
-                `Trade: ${trade.side === 'BUY' ? 'Buy' : 'Sell'}`,
-                `Price: $${trade.price.toFixed(2)}`,
-              ];
+            const lines: string[] = [];
+            
+            if (context.dataset.label === 'Portfolio Value' && point.profit !== undefined && point.profitPercentage !== undefined) {
+              const isPointProfit = point.profit > 0;
+              const profitFormatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Math.abs(point.profit));
+              lines.push(`P/L: ${isPointProfit ? '▲ +' : '▼ -'}${profitFormatted} (${point.profitPercentage.toFixed(2)}%)`);
             }
-            return [];
+            
+            if (point.trade && context.dataset.label === 'Price') {
+              const isBuy = point.trade.side === 'BUY';
+              lines.push(`${isBuy ? '▲ Buy' : '▼ Sell'}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(point.trade.price)}`);
+              
+              if (point.trade.quantity) {
+                lines.push(`Size: ${point.trade.quantity} shares`);
+                const tradeValue = point.trade.quantity * point.trade.price;
+                lines.push(`Value: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(tradeValue)}`);
+              }
+            }
+            
+            return lines;
           },
         },
       },
     },
     interaction: {
-      mode: 'nearest',
-      intersect: true
+      mode: 'index',
+      intersect: false
     },
     hover: {
-      mode: 'nearest',
-      intersect: true
+      mode: 'index',
+      intersect: false
+    },
+    animation: {
+      duration: 400,
     }
   };
 
-  const tradeAnnotations: { annotation: { annotations: TradeAnnotation[] } } = {
+  const tradeAnnotations = {
     annotation: {
-      annotations: enrichedData.reduce((annotations: TradeAnnotation[], point, index) => {
+      annotations: enrichedData.reduce<TradeAnnotation[]>((annotations, point, index) => {
         if (point.trade) {
           const isBuy = point.trade.side === 'BUY';
           const yValue = activeTab === 'price' ? point.price : point.indicators.portfolio_value;
@@ -267,7 +368,8 @@ export function TradingChart({ data }: TradingChartProps) {
         borderColor: '#adb5bd',
         borderDash: [5, 5],
         fill: false,
-        pointRadius: enrichedData.map(point => point.trade ? 0 : 0),
+        pointRadius: 0,
+        order: 2,
       },
       {
         label: 'Portfolio Value',
@@ -275,7 +377,10 @@ export function TradingChart({ data }: TradingChartProps) {
         borderColor: '#40c057',
         backgroundColor: 'rgba(64, 192, 87, 0.2)',
         fill: 'origin',
-        pointRadius: enrichedData.map(point => point.trade ? 0 : 0),
+        pointRadius: 0,
+        pointHoverBackgroundColor: '#40c057',
+        pointHoverBorderColor: 'white',
+        order: 1,
       },
     ],
   };
@@ -287,11 +392,13 @@ export function TradingChart({ data }: TradingChartProps) {
       data: enrichedData.map(d => d.price),
       borderColor: '#228be6',
       fill: false,
-      pointRadius: enrichedData.map(point => point.trade ? 0 : 0),
+      pointRadius: 0,
+      pointHoverBackgroundColor: '#228be6',
+      pointHoverBorderColor: 'white',
     }],
   };
 
-  const performanceChartOptions: ChartOptions<'line'> = useMemo(() => {
+  const performanceChartOptions = useMemo<ChartOptions<'line'>>(() => {
     const baseline = data.initial_capital;
     let maxDeviation = 0;
     portfolioValues.forEach(value => {
@@ -301,52 +408,53 @@ export function TradingChart({ data }: TradingChartProps) {
     const yAxisMin = baseline - maxDeviation * 1.1;
     const yAxisMax = baseline + maxDeviation * 1.1;
 
+    const scales: ChartOptions<'line'>['scales'] = {
+      x: {
+        type: 'category',
+        ticks: {
+          callback: xAxisTicksCallback,
+          autoSkipPadding: 50,
+          maxRotation: 0,
+          minRotation: 0,
+          display: !isMobile,
+        },
+        grid: {
+          display: !isMobile,
+        },
+      },
+      y: {
+        type: 'linear',
+        position: 'left',
+        title: {
+          display: !isMobile,
+          text: 'Portfolio Value ($)',
+          align: 'end',
+        },
+        min: yAxisMin,
+        max: yAxisMax,
+        ticks: {
+          callback: yAxisTicksCallback,
+          padding: 10,
+          display: !isMobile,
+        },
+        grid: {
+          color: isMobile ? 'transparent' : '#ced4da',
+          display: !isMobile,
+        },
+      },
+    };
+
     return {
       ...chartOptionsBase,
-      plugins: { ...chartOptionsBase.plugins, ...tradeAnnotations },
-      scales: {
-        ...(chartOptionsBase.scales || {}), // Provide default empty object if scales is undefined
-        x: {
-          ...(chartOptionsBase.scales?.x || {}), // Provide default empty object if x scale is undefined
-          type: 'category', // Ensure type is defined here as well, if it was intended from base
-          ticks: {
-            ...(chartOptionsBase.scales?.x?.ticks || {}), // Optional chaining for ticks
-            callback: xAxisTicksCallback,
-            autoSkipPadding: 50,
-            maxRotation: 0,
-            minRotation: 0,
-            display: !isMobile,
-          },
-          grid: {
-            ...(chartOptionsBase.scales?.x?.grid || {}), // Optional chaining for grid
-            display: !isMobile,
-          },
-        },
-        y: {
-          ...(chartOptionsBase.scales?.y || {}), // Provide default empty object if y scale is undefined
-          type: 'linear', // Ensure type is defined here as well, if it was intended from base
-          position: 'left',
-          title: { ...(chartOptionsBase.scales?.y?.title || {}), display: !isMobile, text: 'Portfolio Value ($)', align: 'end' }, // Optional chaining for title
-          min: yAxisMin,
-          max: yAxisMax,
-          ticks: {
-            ...(chartOptionsBase.scales?.y?.ticks || {}), // Optional chaining for ticks
-            callback: yAxisTicksCallback,
-            padding: 10,
-            display: !isMobile,
-          },
-          grid: {
-            ...(chartOptionsBase.scales?.y?.grid || {}), // Optional chaining for grid
-            color: isMobile ? 'transparent' : '#ced4da',
-            display: !isMobile,
-          },
-        },
-      } as ChartOptions<'line'>['scales'], // Type assertion to help TS understand the structure
+      plugins: {
+        ...chartOptionsBase.plugins,
+        ...tradeAnnotations,
+      },
+      scales,
     };
   }, [data, portfolioValues, tradeAnnotations, chartOptionsBase, isMobile, xAxisTicksCallback, yAxisTicksCallback]);
 
-
-  const priceChartOptions: ChartOptions<'line'> = useMemo(() => {
+  const priceChartOptions = useMemo<ChartOptions<'line'>>(() => {
     const baseline = enrichedData[0]?.price || 0;
     let maxDeviation = 0;
     priceValues.forEach(value => {
@@ -356,59 +464,60 @@ export function TradingChart({ data }: TradingChartProps) {
     const yAxisMin = baseline === 0 ? 0 : baseline - maxDeviation * 1.1;
     const yAxisMax = baseline + maxDeviation * 1.1;
 
+    const scales: ChartOptions<'line'>['scales'] = {
+      x: {
+        type: 'category',
+        ticks: {
+          callback: xAxisTicksCallback,
+          autoSkipPadding: 50,
+          maxRotation: 0,
+          minRotation: 0,
+          display: !isMobile,
+        },
+        grid: {
+          display: !isMobile,
+        },
+      },
+      y: {
+        type: 'linear',
+        position: 'left',
+        title: {
+          display: !isMobile,
+          text: 'Price ($)',
+          align: 'end',
+        },
+        min: yAxisMin,
+        max: yAxisMax,
+        ticks: {
+          callback: yAxisTicksCallback,
+          padding: 10,
+          display: !isMobile,
+        },
+        grid: {
+          color: isMobile ? 'transparent' : '#ced4da',
+          display: !isMobile,
+        },
+      },
+    };
+
     return {
       ...chartOptionsBase,
-      plugins: { ...chartOptionsBase.plugins, ...tradeAnnotations },
-      scales: {
-        ...(chartOptionsBase.scales || {}), // Provide default empty object if scales is undefined
-        x: {
-          ...(chartOptionsBase.scales?.x || {}), // Provide default empty object if x scale is undefined
-          type: 'category', // Ensure type is defined here as well, if it was intended from base
-          ticks: {
-            ...(chartOptionsBase.scales?.x?.ticks || {}), // Optional chaining for ticks
-            callback: xAxisTicksCallback,
-            autoSkipPadding: 50,
-            maxRotation: 0,
-            minRotation: 0,
-            display: !isMobile,
-          },
-          grid: {
-            ...(chartOptionsBase.scales?.x?.grid || {}), // Optional chaining for grid
-            display: !isMobile,
-          },
-        },
-        y: {
-          ...(chartOptionsBase.scales?.y || {}), // Provide default empty object if y scale is undefined
-          type: 'linear', // Ensure type is defined here as well, if it was intended from base
-          position: 'left',
-          title: { ...(chartOptionsBase.scales?.y?.title || {}), display: !isMobile, text: 'Price ($)', align: 'end' }, // Optional chaining for title
-          min: yAxisMin,
-          max: yAxisMax,
-          ticks: {
-            ...(chartOptionsBase.scales?.y?.ticks || {}), // Optional chaining for ticks
-            callback: yAxisTicksCallback,
-            padding: 10,
-            display: !isMobile,
-          },
-          grid: {
-            ...(chartOptionsBase.scales?.y?.grid || {}), // Optional chaining for grid
-            color: isMobile ? 'transparent' : '#ced4da',
-            display: !isMobile,
-          },
-        },
-      } as ChartOptions<'line'>['scales'], // Type assertion to help TS understand the structure
+      plugins: {
+        ...chartOptionsBase.plugins,
+        ...tradeAnnotations,
+      },
+      scales,
     };
   }, [chartOptionsBase, priceValues, tradeAnnotations, enrichedData, isMobile, xAxisTicksCallback, yAxisTicksCallback]);
 
-
   return (
     <Stack gap="xl">
-      <Box  p="md" style={{  // Replaced Card with Box for the top section
+      <Box p="md" style={{
         borderWidth: '2px',
         borderColor: isProfit ? 'var(--mantine-color-green-4)' : 'var(--mantine-color-red-4)',
         background: 'linear-gradient(to right, white, var(--mantine-color-gray-0))',
-        borderRadius: '8px', // Added border radius back for the top section
-        padding: '20px' // Added padding back for the top section
+        borderRadius: '8px',
+        padding: '20px'
       }}>
         <Grid gutter="xl">
           <Grid.Col span={{ base: 12, md: 4 }}>
@@ -481,7 +590,7 @@ export function TradingChart({ data }: TradingChartProps) {
         </Grid>
       </Box>
 
-      <Box style={{ /*borderWidth: '2px', border: '1px solid #e0e0e0', borderRadius: '8px', */ marginTop: '20px' }}> {/* Removed Card, added Box, removed border for simplicity but kept marginTop*/}
+      <Box style={{ marginTop: '20px' }}>
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List grow>
             <Tabs.Tab value="performance" fw={500}>Portfolio Analysis</Tabs.Tab>

@@ -23,7 +23,6 @@ import {
   ChartData,
   Chart,
   TooltipItem,
-  ScriptableTooltipContext,
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from 'react-chartjs-2';

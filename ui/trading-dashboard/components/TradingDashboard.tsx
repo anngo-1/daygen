@@ -146,17 +146,61 @@ const STRATEGIES: StrategyOption[] = [
   { value: 'macd', label: 'MACD Strategy' },
 ];
 
+function isValidTradingTime(date: Date): boolean {
+  // Convert to Eastern Time
+  const easternTime = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const hours = easternTime.getHours();
+  const minutes = easternTime.getMinutes();
+
+  // Trading hours are 9:30 AM - 4:00 PM ET
+  const marketOpen = hours === 9 ? minutes >= 30 : hours > 9;
+  const marketClose = hours < 16; // Before 4:00 PM
+
+  return marketOpen && marketClose;
+}
+
 function getLastWeekday(): Date {
   const today = dayjs();
-  if (today.day() >= 1 && today.day() <= 5) {
+  let date = today;
+
+  // First check if current time is valid for today
+  if (today.day() >= 1 && today.day() <= 5 && isValidTradingTime(today.toDate())) {
     return today.toDate();
   }
-  let date = today;
-  while (date.day() === 0 || date.day() === 6) {
+
+  // If not valid, start looking backwards
+  while (true) {
     date = date.subtract(1, 'day');
+
+    // Check if it's a weekday
+    if (date.day() >= 1 && date.day() <= 5) {
+      // For past dates, set time to 3:59 PM ET (just before market close)
+      const tradingTime = date
+        .hour(15)  // 3 PM
+        .minute(59)
+        .second(0);
+
+      return tradingTime.toDate();
+    }
   }
-  return date.toDate();
 }
+
+const minDate = dayjs().subtract(60, 'days').toDate();
+const maxDate = new Date();
+
+const isDateWithinRange = (dateToCheck: Date | null | [Date | null, Date | null]): boolean => {
+  if (!dateToCheck) return false;
+
+  if (Array.isArray(dateToCheck)) { // Date range
+    const startDate = dateToCheck[0];
+    const endDate = dateToCheck[1];
+    if (!startDate || !endDate) return false;
+    return dayjs(startDate).isAfter(dayjs(minDate).subtract(1, 'day')) && dayjs(endDate).isBefore(dayjs(maxDate).add(1, 'day'));
+  } else { // Single date
+    return dayjs(dateToCheck).isAfter(dayjs(minDate).subtract(1, 'day')) && dayjs(dateToCheck).isBefore(dayjs(maxDate).add(1, 'day'));
+  }
+};
+
 
 export function TradingDashboard() {
   const [symbol, setSymbol] = useState<string>('AAPL');
@@ -172,6 +216,9 @@ export function TradingDashboard() {
   const [days, setDays] = useState<number>(1);
   const [initialCapital, setInitialCapital] = useState<number>(100000);
   const [currentError, setCurrentError] = useState<string | null>(null);
+  const [isDateValid, setIsDateValid] = useState<boolean>(true);
+  const [isTradingHoursValid, setIsTradingHoursValid] = useState<boolean>(true);
+
 
   const {
     data,
@@ -180,9 +227,39 @@ export function TradingDashboard() {
     runSimulation
   } = useTradingSimulation();
 
+  const setDateHandler = (value: Date | null) => {
+    if (value) {
+      setDate(value);
+      setIsDateValid(isDateWithinRange(value));
+      if (dateMode === 'single' && dayjs(value).isSame(dayjs(), 'day')) {
+        setIsTradingHoursValid(isValidTradingTime(value));
+      } else {
+        setIsTradingHoursValid(true); // For historical dates, trading hours are always valid in this context
+      }
+    }
+  };
+
+  const setDateRangeHandler = (value: [Date | null, Date | null]) => {
+    setDateRange(value);
+    setIsDateValid(isDateWithinRange(value));
+    setIsTradingHoursValid(true); // Date ranges are always considered valid trading hours (historical)
+  };
+
+
   const submitSimulation = useCallback(() => {
+    if (!isDateValid) {
+      setCurrentError("Date out of range");
+      return;
+    }
+    if (!isTradingHoursValid && dateMode === 'single' && dayjs(date).isSame(dayjs(), 'day')) {
+      setCurrentError("Outside trading hours");
+      return;
+    }
+    setCurrentError(null); // Clear any previous errors
+
     if (dateMode === 'single' && !date) return;
     if (dateMode === 'range' && (!dateRange[0] || !dateRange[1])) return;
+
 
     if (dateMode === 'single') {
       runSimulation({
@@ -208,10 +285,9 @@ export function TradingDashboard() {
         initial_capital: initialCapital,
       });
     }
-  }, [dateMode, date, dateRange, symbol, interval, strategy, days, initialCapital, runSimulation]);
+  }, [dateMode, date, dateRange, symbol, interval, strategy, days, initialCapital, runSimulation, isDateValid, isTradingHoursValid, setIsTradingHoursValid]);
 
   const handleSubmit = useCallback(() => {
-    setCurrentError(null);
     submitSimulation();
   }, [submitSimulation]);
 
@@ -223,8 +299,6 @@ export function TradingDashboard() {
     }
   }, [error]);
 
-
-  const minDate = dayjs().subtract(60, 'days').toDate();
 
   return (
     <MantineProvider theme={theme}>
@@ -284,24 +358,70 @@ export function TradingDashboard() {
                   </Grid.Col>
 
                   <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
-                    {dateMode === 'single' ? (
-                      <DateInput
-                        label="Trading Date"
-                        placeholder="Select date"
-                        value={date}
-                        onChange={(value: Date | null) => value && setDate(value)}
-                        minDate={minDate}
-                      />
-                    ) : (
-                      <DatePickerInput
-                        type="range"
-                        label="Date Range"
-                        placeholder="Select dates"
-                        value={dateRange}
-                        onChange={(value: [Date | null, Date | null]) => setDateRange(value)}
-                        minDate={minDate}
-                      />
-                    )}
+                    <Stack gap="xs">
+                      {dateMode === 'single' ? (
+                        <>
+                          <DateInput
+                            label={
+                              <Group gap={5} justify="space-between">
+                                <span>Trading Date</span>
+                                <Tooltip label="Trading hours: 9:30 AM - 4:00 PM ET">
+                                  <IconInfoCircle style={{ width: rem(14), height: rem(14) }} className="cursor-help" />
+                                </Tooltip>
+                              </Group>
+                            }
+                            placeholder="Select date"
+                            value={date}
+                            onChange={setDateHandler}
+                            minDate={minDate}
+                            maxDate={maxDate}
+                          />
+                          <Group gap="xs">
+                            {!(dayjs(date).isSame(dayjs(), 'day') && !isValidTradingTime(date)) && (
+                              <Text size="sm" c={dayjs(date).isSame(dayjs(), 'day') && isValidTradingTime(date) ? "green.6" : "gray.6"}>
+                                {dayjs(date).isSame(dayjs(), 'day') && isValidTradingTime(date) ? (
+                                  "✓ Using live market data"
+                                ) : dayjs(date).isSame(dayjs(), 'day') ? (
+                                  "Using last valid data"
+                                ) : (
+                                  "Using historical data"
+                                )}
+                              </Text>
+                            )}
+                          </Group>
+                          {!isTradingHoursValid && dayjs(date).isSame(dayjs(), 'day') && (
+                            <Text size="sm" c="red.7">
+                              Currently outside trading hours - Please select a different date.
+                            </Text>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <DatePickerInput
+                            type="range"
+                            label="Date Range"
+                            placeholder="Select dates"
+                            value={dateRange}
+                            onChange={setDateRangeHandler}
+                            minDate={minDate}
+                            maxDate={maxDate}
+                          />
+                          <Text size="sm" c="gray.6">
+                            Using historical data
+                          </Text>
+                        </>
+                      )}
+                      {!isDateValid && dateMode === 'single' && (
+                        <Text size="sm" c="red.7">
+                          Date out of range - Please select a date within the last 60 days.
+                        </Text>
+                      )}
+                      {!isDateValid && dateMode === 'range' && (
+                        <Text size="sm" c="red.7">
+                          Date range out of range - Please select dates within the last 60 days.
+                        </Text>
+                      )}
+                    </Stack>
                   </Grid.Col>
 
                   <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
@@ -343,6 +463,7 @@ export function TradingDashboard() {
                     onClick={handleSubmit}
                     loading={loading}
                     leftSection={loading ? <Loader size="xs" color="white" /> : null}
+                    disabled={!isDateValid || (!isTradingHoursValid && dateMode === 'single' && dayjs(date).isSame(dayjs(), 'day'))}
                   >
                     Run Simulation
                   </Button>
@@ -350,7 +471,18 @@ export function TradingDashboard() {
               </Stack>
             </Card>
 
-            {currentError && (
+            {currentError === "Date out of range" && (
+              <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
+                <Text c="red.7" fw={500}>Date out of range - Please select a date within the last 60 days.</Text>
+              </Paper>
+            )}
+            {currentError === "Outside trading hours" && (
+              <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
+                <Text c="red.7" fw={500}>Outside trading hours - Run simulation is disabled. Please select a date within trading hours (9:30 AM - 4:00 PM ET) or a different date.</Text>
+              </Paper>
+            )}
+
+            {currentError && currentError !== "Date out of range" && currentError !== "Outside trading hours" && (
               <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
                 <Text c="red.7" fw={500}>No data returned - Check Stock Ticker or Change Date</Text>
               </Paper>

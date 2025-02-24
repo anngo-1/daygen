@@ -151,8 +151,17 @@ function isValidTradingTime(date: Date): boolean {
   const easternTime = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const hours = easternTime.getHours();
   const minutes = easternTime.getMinutes();
+  const today = new Date();
+  const isToday = date.getDate() === today.getDate() && 
+                 date.getMonth() === today.getMonth() && 
+                 date.getFullYear() === today.getFullYear();
 
-  // Trading hours are 9:30 AM - 4:00 PM ET
+  // For today, if after market close (after 4:00 PM ET), data is still available
+  if (isToday && (hours > 16 || (hours === 16 && minutes > 0))) {
+    return true;
+  }
+
+  // Normal trading hours check (9:30 AM - 4:00 PM ET)
   const marketOpen = hours === 9 ? minutes >= 30 : hours > 9;
   const marketClose = hours < 16; // Before 4:00 PM
 
@@ -231,10 +240,15 @@ export function TradingDashboard() {
     if (value) {
       setDate(value);
       setIsDateValid(isDateWithinRange(value));
-      if (dateMode === 'single' && dayjs(value).isSame(dayjs(), 'day')) {
-        setIsTradingHoursValid(isValidTradingTime(value));
+      
+      // For the current day, consider after-hours as valid
+      const isCurrentDay = dayjs(value).isSame(dayjs(), 'day');
+      if (isCurrentDay) {
+        // Always set trading hours as valid for current day (data is available)
+        setIsTradingHoursValid(true);
       } else {
-        setIsTradingHoursValid(true); // For historical dates, trading hours are always valid in this context
+        // For other days, use the normal trading hours check
+        setIsTradingHoursValid(isValidTradingTime(value));
       }
     }
   };
@@ -251,15 +265,19 @@ export function TradingDashboard() {
       setCurrentError("Date out of range");
       return;
     }
-    if (!isTradingHoursValid && dateMode === 'single' && dayjs(date).isSame(dayjs(), 'day')) {
+    
+    // Allow current day submissions regardless of trading hours
+    // since data is available after hours for the current day
+    const isCurrentDay = dayjs(date).isSame(dayjs(), 'day');
+    if (!isTradingHoursValid && dateMode === 'single' && !isCurrentDay) {
       setCurrentError("Outside trading hours");
       return;
     }
+    
     setCurrentError(null); // Clear any previous errors
 
     if (dateMode === 'single' && !date) return;
     if (dateMode === 'range' && (!dateRange[0] || !dateRange[1])) return;
-
 
     if (dateMode === 'single') {
       runSimulation({
@@ -378,18 +396,16 @@ export function TradingDashboard() {
                           />
                           <Group gap="xs">
                             {!(dayjs(date).isSame(dayjs(), 'day') && !isValidTradingTime(date)) && (
-                              <Text size="sm" c={dayjs(date).isSame(dayjs(), 'day') && isValidTradingTime(date) ? "green.6" : "gray.6"}>
-                                {dayjs(date).isSame(dayjs(), 'day') && isValidTradingTime(date) ? (
+                              <Text size="sm" c={dayjs(date).isSame(dayjs(), 'day') ? "green.6" : "gray.6"}>
+                                {dayjs(date).isSame(dayjs(), 'day') ? (
                                   "✓ Using live market data"
-                                ) : dayjs(date).isSame(dayjs(), 'day') ? (
-                                  "Using last valid data"
                                 ) : (
                                   "Using historical data"
                                 )}
                               </Text>
                             )}
                           </Group>
-                          {!isTradingHoursValid && dayjs(date).isSame(dayjs(), 'day') && (
+                          {!isTradingHoursValid && !dayjs(date).isSame(dayjs(), 'day') && (
                             <Text size="sm" c="red.7">
                               Currently outside trading hours - Please select a different date.
                             </Text>
@@ -463,7 +479,7 @@ export function TradingDashboard() {
                     onClick={handleSubmit}
                     loading={loading}
                     leftSection={loading ? <Loader size="xs" color="white" /> : null}
-                    disabled={!isDateValid || (!isTradingHoursValid && dateMode === 'single' && dayjs(date).isSame(dayjs(), 'day'))}
+                    disabled={!isDateValid || (!isTradingHoursValid && dateMode === 'single' && !dayjs(date).isSame(dayjs(), 'day'))}
                   >
                     Run Simulation
                   </Button>

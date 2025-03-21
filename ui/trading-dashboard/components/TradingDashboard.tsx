@@ -146,14 +146,95 @@ const STRATEGIES: StrategyOption[] = [
   { value: 'macd', label: 'MACD Strategy' },
 ];
 
+function isMarketHoliday(date: Date): boolean {
+  const easternDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const year = easternDate.getFullYear();
+  const month = easternDate.getMonth();
+  const day = easternDate.getDate();
+  
+  const newYearsDay = new Date(year, 0, 1);
+  if (newYearsDay.getDay() === 0) newYearsDay.setDate(2);
+  
+  const mlkDay = new Date(year, 0, 1);
+  mlkDay.setDate(1 + (15 - mlkDay.getDay() + 7) % 7 + 14);
+  
+  const presidentsDay = new Date(year, 1, 1);
+  presidentsDay.setDate(1 + (15 - presidentsDay.getDay() + 7) % 7 + 14);
+  
+  const goodFriday = new Date(year, 2, 22);
+  
+  const memorialDay = new Date(year, 5, 0);
+  memorialDay.setDate(memorialDay.getDate() - (memorialDay.getDay() + 6) % 7);
+  
+  const juneteenth = new Date(year, 5, 19);
+  if (juneteenth.getDay() === 0) juneteenth.setDate(20);
+  if (juneteenth.getDay() === 6) juneteenth.setDate(18);
+  
+  const independenceDay = new Date(year, 6, 4);
+  if (independenceDay.getDay() === 0) independenceDay.setDate(5);
+  if (independenceDay.getDay() === 6) independenceDay.setDate(3);
+  
+  const laborDay = new Date(year, 8, 1);
+  laborDay.setDate(1 + (8 - laborDay.getDay()) % 7);
+  
+  const thanksgiving = new Date(year, 10, 1);
+  thanksgiving.setDate(1 + (4 - thanksgiving.getDay() + 7) % 7 + 21);
+  
+  const christmas = new Date(year, 11, 25);
+  if (christmas.getDay() === 0) christmas.setDate(26);
+  if (christmas.getDay() === 6) christmas.setDate(24);
+  
+  const holidays = [
+    newYearsDay, mlkDay, presidentsDay, goodFriday, memorialDay, 
+    juneteenth, independenceDay, laborDay, thanksgiving, christmas
+  ];
+  
+  return holidays.some(holiday => 
+    holiday.getDate() === day && 
+    holiday.getMonth() === month && 
+    holiday.getFullYear() === year
+  );
+}
+
+function isEarlyClosureDay(date: Date): boolean {
+  const easternDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const year = easternDate.getFullYear();
+  const month = easternDate.getMonth();
+  const day = easternDate.getDate();
+  
+  const independenceDayEve = new Date(year, 6, 3);
+  if (independenceDayEve.getDay() !== 0 && independenceDayEve.getDay() !== 6) {
+    if (day === 3 && month === 6) return true;
+  }
+  
+  const thanksgiving = new Date(year, 10, 1);
+  thanksgiving.setDate(1 + (4 - thanksgiving.getDay() + 7) % 7 + 21);
+  const blackFriday = new Date(thanksgiving);
+  blackFriday.setDate(thanksgiving.getDate() + 1);
+  if (day === blackFriday.getDate() && month === 10) return true;
+  
+  const christmasEve = new Date(year, 11, 24);
+  if (christmasEve.getDay() !== 0 && christmasEve.getDay() !== 6) {
+    if (day === 24 && month === 11) return true;
+  }
+  
+  return false;
+}
+
+function getEasternTime(date: Date): Date {
+  return new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+}
+
 function isValidTradingTime(date: Date): boolean {
-  // Check if it's a weekend
   const day = date.getDay();
-  if (day === 0 || day === 6) {  // 0 = Sunday, 6 = Saturday
+  if (day === 0 || day === 6) {
     return false;
   }
-
-  // For historical dates, all weekdays are valid regardless of trading hours
+  
+  if (isMarketHoliday(date)) {
+    return false;
+  }
+  
   const today = new Date();
   const isToday = date.getDate() === today.getDate() && 
                  date.getMonth() === today.getMonth() && 
@@ -162,38 +243,45 @@ function isValidTradingTime(date: Date): boolean {
   if (!isToday) {
     return true;
   }
-
-  // For today, check trading hours
-  // Convert to Eastern Time
-  const easternTime = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  
+  const easternTime = getEasternTime(date);
   const hours = easternTime.getHours();
   const minutes = easternTime.getMinutes();
   
-  // Normal trading hours check (9:30 AM - 4:00 PM ET)
-  const marketOpen = hours === 9 ? minutes >= 30 : hours > 9;
-  const marketClose = hours < 16; // Before 4:00 PM
+  const marketHasOpened = hours > 9 || (hours === 9 && minutes >= 30);
+  
+  return marketHasOpened;
+}
 
-  return marketOpen && marketClose;
+function getNextValidTradingDay(fromDate: Date): Date {
+  const nextDay = new Date(fromDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+  
+  while (
+    nextDay.getDay() === 0 || 
+    nextDay.getDay() === 6 || 
+    isMarketHoliday(nextDay)
+  ) {
+    nextDay.setDate(nextDay.getDate() + 1);
+  }
+  
+  return nextDay;
 }
 
 function getLastWeekday(): Date {
   const today = dayjs();
   let date = today;
 
-  // First check if current time is valid for today
   if (today.day() >= 1 && today.day() <= 5 && isValidTradingTime(today.toDate())) {
     return today.toDate();
   }
 
-  // If not valid, start looking backwards
   while (true) {
     date = date.subtract(1, 'day');
 
-    // Check if it's a weekday
-    if (date.day() >= 1 && date.day() <= 5) {
-      // For past dates, set time to 3:59 PM ET (just before market close)
+    if (date.day() >= 1 && date.day() <= 5 && !isMarketHoliday(date.toDate())) {
       const tradingTime = date
-        .hour(15)  // 3 PM
+        .hour(15)
         .minute(59)
         .second(0);
 
@@ -208,16 +296,41 @@ const maxDate = new Date();
 const isDateWithinRange = (dateToCheck: Date | null | [Date | null, Date | null]): boolean => {
   if (!dateToCheck) return false;
 
-  if (Array.isArray(dateToCheck)) { // Date range
+  if (Array.isArray(dateToCheck)) {
     const startDate = dateToCheck[0];
     const endDate = dateToCheck[1];
     if (!startDate || !endDate) return false;
     return dayjs(startDate).isAfter(dayjs(minDate).subtract(1, 'day')) && dayjs(endDate).isBefore(dayjs(maxDate).add(1, 'day'));
-  } else { // Single date
+  } else {
     return dayjs(dateToCheck).isAfter(dayjs(minDate).subtract(1, 'day')) && dayjs(dateToCheck).isBefore(dayjs(maxDate).add(1, 'day'));
   }
 };
 
+function validateDateRange(startDate: Date | null, endDate: Date | null): string | null {
+  if (!startDate || !endDate) return "Please select both start and end dates";
+  
+  if (startDate > endDate) return "Start date must be before end date";
+  
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays > 60) return "Date range cannot exceed 60 days";
+  
+  let currentDate = new Date(startDate.getTime());
+  let hasValidTradingDay = false;
+  
+  while (currentDate <= endDate) {
+    if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6 && !isMarketHoliday(currentDate)) {
+      hasValidTradingDay = true;
+      break;
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  if (!hasValidTradingDay) return "Selected range contains no trading days";
+  
+  return null;
+}
 
 export function TradingDashboard() {
   const [symbol, setSymbol] = useState<string>('AAPL');
@@ -236,7 +349,6 @@ export function TradingDashboard() {
   const [isDateValid, setIsDateValid] = useState<boolean>(true);
   const [isTradingHoursValid, setIsTradingHoursValid] = useState<boolean>(true);
 
-
   const {
     data,
     loading,
@@ -249,38 +361,50 @@ export function TradingDashboard() {
       setDate(value);
       setIsDateValid(isDateWithinRange(value));
       
-      // Check if it's a weekend
       const day = value.getDay();
       if (day === 0 || day === 6) {
         setIsTradingHoursValid(false);
         return;
       }
       
-      // For historical dates, all weekdays are valid
+      if (isMarketHoliday(value)) {
+        setIsTradingHoursValid(false);
+        return;
+      }
+      
       const isCurrentDay = dayjs(value).isSame(dayjs(), 'day');
       if (!isCurrentDay) {
         setIsTradingHoursValid(true);
         return;
       }
       
-      // For today, check trading hours
-      const easternTime = new Date(value.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const easternTime = getEasternTime(value);
       const hours = easternTime.getHours();
       const minutes = easternTime.getMinutes();
       
-      const marketOpen = hours === 9 ? minutes >= 30 : hours > 9;
-      const marketClose = hours < 16;
+      const marketHasOpened = hours > 9 || (hours === 9 && minutes >= 30);
       
-      setIsTradingHoursValid(marketOpen && marketClose);
+      setIsTradingHoursValid(marketHasOpened);
     }
   };
 
   const setDateRangeHandler = (value: [Date | null, Date | null]) => {
     setDateRange(value);
     setIsDateValid(isDateWithinRange(value));
-    setIsTradingHoursValid(true); // Date ranges are always considered valid trading hours (historical)
+    
+    if (value[0] && value[1]) {
+      const rangeError = validateDateRange(value[0], value[1]);
+      if (rangeError) {
+        setCurrentError(rangeError);
+        setIsTradingHoursValid(false);
+      } else {
+        setCurrentError(null);
+        setIsTradingHoursValid(true);
+      }
+    } else {
+      setIsTradingHoursValid(true);
+    }
   };
-
 
   const submitSimulation = useCallback(() => {
     if (!isDateValid) {
@@ -289,33 +413,41 @@ export function TradingDashboard() {
     }
     
     if (dateMode === 'single') {
-      // Check if it's a weekend
       const day = date.getDay();
       if (day === 0 || day === 6) {
         setCurrentError("Weekend - Markets closed");
         return;
       }
       
-      // For the current day, check trading hours
+      if (isMarketHoliday(date)) {
+        setCurrentError("Holiday - Markets closed");
+        return;
+      }
+      
       const isCurrentDay = dayjs(date).isSame(dayjs(), 'day');
       if (isCurrentDay) {
-        // Convert to Eastern Time
-        const easternTime = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+        const easternTime = getEasternTime(date);
         const hours = easternTime.getHours();
         const minutes = easternTime.getMinutes();
         
-        // Normal trading hours check (9:30 AM - 4:00 PM ET)
-        const marketOpen = hours === 9 ? minutes >= 30 : hours > 9;
-        const marketClose = hours < 16; // Before 4:00 PM
+        const marketHasOpened = hours > 9 || (hours === 9 && minutes >= 30);
         
-        if (!(marketOpen && marketClose)) {
-          setCurrentError("Outside trading hours");
+        if (!marketHasOpened) {
+          setCurrentError("Market not yet open today");
           return;
         }
       }
+    } else {
+      if (!dateRange[0] || !dateRange[1]) return;
+      
+      const rangeError = validateDateRange(dateRange[0], dateRange[1]);
+      if (rangeError) {
+        setCurrentError(rangeError);
+        return;
+      }
     }
     
-    setCurrentError(null); // Clear any previous errors
+    setCurrentError(null);
 
     if (dateMode === 'single' && !date) return;
     if (dateMode === 'range' && (!dateRange[0] || !dateRange[1])) return;
@@ -358,11 +490,9 @@ export function TradingDashboard() {
     }
   }, [error]);
 
-  // Add initial simulation run on component mount
   useEffect(() => {
     submitSimulation();
   }, []);
-
 
   return (
     <MantineProvider theme={theme}>
@@ -451,9 +581,14 @@ export function TradingDashboard() {
                               </Text>
                             )}
                           </Group>
+                          {!isTradingHoursValid && dayjs(date).isSame(dayjs(), 'day') && (
+                            <Text size="sm" c="red.7">
+                              Market not yet open today - Please wait until 9:30 AM ET.
+                            </Text>
+                          )}
                           {!isTradingHoursValid && !dayjs(date).isSame(dayjs(), 'day') && (
                             <Text size="sm" c="red.7">
-                              Currently outside trading hours - Please select a different date.
+                              Weekend or holiday - Markets closed on this date.
                             </Text>
                           )}
                         </>
@@ -482,6 +617,22 @@ export function TradingDashboard() {
                         <Text size="sm" c="red.7">
                           Date range out of range - Please select dates within the last 60 days.
                         </Text>
+                      )}
+                      {!isTradingHoursValid && (
+                        <Group gap="apart" mt="xs">
+                          <Button 
+                            variant="subtle" 
+                            size="sm"
+                            onClick={() => {
+                              const nextTradingDay = getNextValidTradingDay(date);
+                              setDate(nextTradingDay);
+                              setIsDateValid(isDateWithinRange(nextTradingDay));
+                              setIsTradingHoursValid(true);
+                            }}
+                          >
+                            Use next trading day
+                          </Button>
+                        </Group>
                       )}
                     </Stack>
                   </Grid.Col>
@@ -538,9 +689,9 @@ export function TradingDashboard() {
                 <Text c="red.7" fw={500}>Date out of range - Please select a date within the last 60 days.</Text>
               </Paper>
             )}
-            {currentError === "Outside trading hours" && (
+            {currentError === "Market not yet open today" && (
               <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
-                <Text c="red.7" fw={500}>Outside trading hours - Run simulation is disabled. Please select a date within trading hours (9:30 AM - 4:00 PM ET) or a different date.</Text>
+                <Text c="red.7" fw={500}>Market not yet open today - Please wait until 9:30 AM ET or select a previous trading day.</Text>
               </Paper>
             )}
             {currentError === "Weekend - Markets closed" && (
@@ -548,8 +699,35 @@ export function TradingDashboard() {
                 <Text c="red.7" fw={500}>Weekend - Markets closed. Please select a weekday.</Text>
               </Paper>
             )}
-
-            {currentError && currentError !== "Date out of range" && currentError !== "Outside trading hours" && currentError !== "Weekend - Markets closed" && (
+            {currentError === "Holiday - Markets closed" && (
+              <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
+                <Text c="red.7" fw={500}>Holiday - Markets closed on this date. Please select a different date.</Text>
+              </Paper>
+            )}
+            {currentError === "Selected range contains no trading days" && (
+              <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
+                <Text c="red.7" fw={500}>Selected range contains no trading days. Please select a different range.</Text>
+              </Paper>
+            )}
+            {currentError === "Start date must be before end date" && (
+              <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
+                <Text c="red.7" fw={500}>Start date must be before end date. Please adjust your selection.</Text>
+              </Paper>
+            )}
+            {currentError === "Date range cannot exceed 60 days" && (
+              <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
+                <Text c="red.7" fw={500}>Date range cannot exceed 60 days. Please select a shorter range.</Text>
+              </Paper>
+            )}
+            {currentError && ![
+              "Date out of range", 
+              "Market not yet open today", 
+              "Weekend - Markets closed", 
+              "Holiday - Markets closed",
+              "Selected range contains no trading days",
+              "Start date must be before end date",
+              "Date range cannot exceed 60 days"
+            ].includes(currentError) && (
               <Paper withBorder p="md" bg="red.0" radius="md" style={{ borderWidth: '2px', borderColor: 'var(--mantine-color-red-5)' }}>
                 <Text c="red.7" fw={500}>No data returned - Check Stock Ticker or Change Date</Text>
               </Paper>

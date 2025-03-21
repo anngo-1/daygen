@@ -196,31 +196,6 @@ function isMarketHoliday(date: Date): boolean {
   );
 }
 
-function isEarlyClosureDay(date: Date): boolean {
-  const easternDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const year = easternDate.getFullYear();
-  const month = easternDate.getMonth();
-  const day = easternDate.getDate();
-  
-  const independenceDayEve = new Date(year, 6, 3);
-  if (independenceDayEve.getDay() !== 0 && independenceDayEve.getDay() !== 6) {
-    if (day === 3 && month === 6) return true;
-  }
-  
-  const thanksgiving = new Date(year, 10, 1);
-  thanksgiving.setDate(1 + (4 - thanksgiving.getDay() + 7) % 7 + 21);
-  const blackFriday = new Date(thanksgiving);
-  blackFriday.setDate(thanksgiving.getDate() + 1);
-  if (day === blackFriday.getDate() && month === 10) return true;
-  
-  const christmasEve = new Date(year, 11, 24);
-  if (christmasEve.getDay() !== 0 && christmasEve.getDay() !== 6) {
-    if (day === 24 && month === 11) return true;
-  }
-  
-  return false;
-}
-
 function getEasternTime(date: Date): Date {
   return new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
 }
@@ -316,7 +291,7 @@ function validateDateRange(startDate: Date | null, endDate: Date | null): string
   
   if (diffDays > 60) return "Date range cannot exceed 60 days";
   
-  let currentDate = new Date(startDate.getTime());
+  const currentDate = new Date(startDate.getTime());
   let hasValidTradingDay = false;
   
   while (currentDate <= endDate) {

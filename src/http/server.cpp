@@ -1,6 +1,8 @@
 #include "http/server.h"
 #include "data/data_fetcher.h"
+#include "strategies/strategy.h"
 #include "strategies/macd_strategy.h"
+#include "strategies/random_strategy.h"
 #include <algorithm>
 #include <iostream> 
 
@@ -10,6 +12,10 @@ TradingServer::TradingServer() {
     server.Get("/simulate", [this](const httplib::Request& req, httplib::Response& res) {
         return handleSimulate(req, res);
     });
+    
+    server.Get("/strategies", [this](const httplib::Request& req, httplib::Response& res) {
+        return handleStrategies(req, res);
+    });
 }
 
 void TradingServer::run() {
@@ -17,23 +23,45 @@ void TradingServer::run() {
     server.listen("0.0.0.0", 18080);
 }
 
-std::unique_ptr<Strategy> TradingServer::createStrategy(const std::string& name) {
-    if (name == "macd" || name.empty()) {
-        return std::make_unique<MACDStrategy>(
-            0.02,  // volEstimate
-            0.3,   // trendAlpha
-            1e-6,  // garchOmega
-            0.1,   // garchAlpha
-            0.85,  // garchBeta
-            12,    // macdFastPeriod
-            26,    // macdSlowPeriod
-            9,     // signalPeriod
-            0.05,  // tradeThresholdFactor
-            0.02,  // stopLossPercentage (e.g., 2%)
-            0.001  // transactionCost (e.g., 0.1%)
-        );
+std::string TradingServer::handleStrategies(const httplib::Request& /* req */, httplib::Response& res) {
+    try {
+        const auto& strategies = Strategy::getRegisteredStrategies();
+        
+        json response = json::array();
+        for (const auto& [id, info] : strategies) {
+            json strategyJson = {
+                {"id", info.id},
+                {"name", info.name},
+                {"description", info.description},
+                {"parameters", json::array()}
+            };
+            
+            // Add parameter information
+            for (const auto& param : info.parameters) {
+                json paramJson = {
+                    {"name", param.name},
+                    {"type", param.type},
+                    {"description", param.description},
+                    {"defaultValue", param.defaultValue}
+                };
+                
+                if (!param.options.empty()) {
+                    paramJson["options"] = param.options;
+                }
+                
+                strategyJson["parameters"].push_back(paramJson);
+            }
+            
+            response.push_back(strategyJson);
+        }
+        
+        res.set_content(response.dump(), "application/json");
+        return "";
+    } catch (const std::exception& ex) {
+        res.status = 500;
+        res.set_content(ex.what(), "text/plain");
+        return "";
     }
-    throw std::runtime_error("Unknown strategy: " + name);
 }
 
 std::string TradingServer::handleSimulate(const httplib::Request& req, httplib::Response& res) {
@@ -79,7 +107,16 @@ std::string TradingServer::handleSimulate(const httplib::Request& req, httplib::
         }
 
 
-        auto strategy = createStrategy(strategyName);
+        // Create the strategy using the registry
+        const auto& strategies = Strategy::getRegisteredStrategies();
+        auto it = strategies.find(strategyName);
+        if (it == strategies.end()) {
+            res.status = 400;
+            res.set_content("Unknown strategy: " + strategyName, "text/plain");
+            return "";
+        }
+        
+        auto strategy = it->second.factory();
         auto result = strategy->execute(marketData, initialCash); // Pass initialCash
 
 

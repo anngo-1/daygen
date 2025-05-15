@@ -1,4 +1,3 @@
-// strategies/macd_strategy.cpp
 #include "strategies/macd_strategy.h"
 #include <cmath>
 #include <iostream>
@@ -10,6 +9,21 @@
 
 namespace trading {
 
+/**
+ * @brief Constructor for the MACD (Moving Average Convergence Divergence) strategy.
+ *
+ * @param volEstimate Initial volatility estimate for the GARCH model
+ * @param trendAlpha Learning rate for the trend estimator (EMA alpha)
+ * @param garchOmega Weight parameter for long-term volatility in the GARCH model
+ * @param garchAlpha Weight parameter for recent returns in the GARCH model
+ * @param garchBeta Weight parameter for previous volatility in the GARCH model
+ * @param macdFastPeriod Period for the fast EMA in the MACD calculation
+ * @param macdSlowPeriod Period for the slow EMA in the MACD calculation
+ * @param signalPeriod Period for the signal line calculation (EMA of the MACD line)
+ * @param tradeThresholdFactor Factor used to determine trade thresholds based on volatility
+ * @param stopLossPercentage Maximum loss percentage before exiting position
+ * @param transactionCost Transaction cost as a percentage of trade value
+ */
 MACDStrategy::MACDStrategy(double volEstimate,
                            double trendAlpha,
                            double garchOmega, double garchAlpha, double garchBeta,
@@ -54,6 +68,22 @@ MACDStrategy::MACDStrategy(double volEstimate,
     }
 }
 
+/**
+ * @brief Main execution method for the MACD strategy.
+ *
+ * Processes market data tick by tick, executing the strategy logic:
+ * 1. Initialize portfolio, estimators, and performance tracking
+ * 2. Process each price point sequentially
+ * 3. Calculate MACD, signal line, trend, and volatility estimates
+ * 4. Execute trades based on MACD crossovers with trend and volatility filters
+ * 5. Apply stop-loss protection for risk management
+ * 6. Liquidate any remaining positions at the end of the session
+ * 7. Return performance metrics and trade history
+ *
+ * @param data Market data containing prices and timestamps
+ * @param initialCash Starting capital for the simulation
+ * @return SimulationResult object with performance metrics and trade history
+ */
 SimulationResult MACDStrategy::execute(const MarketData& data, double initialCash) {
     cash = initialCash;
     position = 0;
@@ -110,7 +140,24 @@ SimulationResult MACDStrategy::execute(const MarketData& data, double initialCas
     return {cash, cash - initialCash, trades, historicalData};  // Include historical data in return
 }
 
-void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTimestamp) { // Receive timestamp
+/**
+ * @brief Processes each price tick and executes strategy logic.
+ *
+ * This is the core method implementing the strategy's decision-making process:
+ * 1. Updates estimators with current price data
+ * 2. Calculates MACD line and signal line values
+ * 3. Updates GARCH volatility estimates
+ * 4. Determines buy/sell thresholds based on trend and volatility
+ * 5. Executes buy signals on MACD > Signal with price confirmation
+ * 6. Executes sell signals on MACD < Signal or volatility-adjusted price targets
+ * 7. Applies stop-loss for risk management
+ * 8. Records performance metrics and trade details
+ *
+ * @param price Current price at this tick
+ * @param timeStep Current time step index
+ * @param tickTimestamp Timestamp string for this tick
+ */
+void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTimestamp) {
     auto now = std::chrono::system_clock::now();
     auto now_c = std::chrono::system_clock::to_time_t(now);
     std::tm now_tm;
@@ -238,10 +285,20 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
     }
 }
 
+/**
+ * @brief Gets the current MACD value.
+ *
+ * @return The current MACD value (difference between fast and slow EMAs)
+ */
 double MACDStrategy::getCurrentMACD() const {
     return currentMACD;
 }
 
+/**
+ * @brief Gets the current signal line value.
+ *
+ * @return The current signal line value (EMA of the MACD)
+ */
 double MACDStrategy::getCurrentSignal() const {
     return currentSignal;
 }

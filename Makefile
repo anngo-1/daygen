@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -I./include
-LDFLAGS = -lcurl
+LDFLAGS = 
 
 # Source files
 SRCS = $(wildcard src/*.cpp) \

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <nlohmann_json.hpp>
+#include "../../nlohmann_json.hpp"
 #include "strategies/base_types.h"
 
 using json = nlohmann::json;

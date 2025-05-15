@@ -1,9 +1,8 @@
 #pragma once
-#include <httplib.h>
+#include "../../httplib.h"
 #include <memory>
 #include <string>
-#include "strategies/strategy.h" 
-#include "strategies/macd_strategy.h"  
+#include "strategies/strategy.h"
 
 namespace trading {
 
@@ -15,7 +14,8 @@ public:
 private:
     std::string handleSimulate(const httplib::Request& req, 
                               httplib::Response& res);
-    std::unique_ptr<Strategy> createStrategy(const std::string& name);
+    std::string handleStrategies(const httplib::Request& req,
+                               httplib::Response& res);
     
     httplib::Server server;
 };

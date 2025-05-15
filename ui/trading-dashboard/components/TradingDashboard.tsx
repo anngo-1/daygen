@@ -19,6 +19,9 @@ import {
   Box,
   createTheme,
   MantineProvider,
+  Modal,
+  List,
+  Divider,
 } from '@mantine/core';
 import { DateInput, DatePickerInput } from '@mantine/dates';
 import { IconInfoCircle } from '@tabler/icons-react';
@@ -26,6 +29,7 @@ import dayjs from 'dayjs';
 import { TradingChart } from './TradingChart';
 import { TradeHistory } from './TradeHistory';
 import { useTradingSimulation } from '@/hooks/useTradingSimulation';
+import { useStrategies } from '@/hooks/useStrategies';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/700.css';
 
@@ -34,10 +38,6 @@ type IntervalOption = {
   label: string;
 };
 
-type StrategyOption = {
-  value: string;
-  label: string;
-};
 
 const theme = createTheme({
   fontFamily: 'Roboto, sans-serif',
@@ -142,9 +142,6 @@ const INTERVALS: IntervalOption[] = [
   { value: '1d', label: '1 Day' },
 ];
 
-const STRATEGIES: StrategyOption[] = [
-  { value: 'macd', label: 'MACD Strategy' },
-];
 
 function isMarketHoliday(date: Date): boolean {
   const easternDate = new Date(date.toLocaleString('en-US', { timeZone: 'America/New_York' }));
@@ -308,8 +305,11 @@ function validateDateRange(startDate: Date | null, endDate: Date | null): string
 }
 
 export function TradingDashboard() {
+  const { strategies, loading: loadingStrategies } = useStrategies();
   const [symbol, setSymbol] = useState<string>('AAPL');
   const [dateMode, setDateMode] = useState<'single' | 'range'>('single');
+  const [strategyModalOpen, setStrategyModalOpen] = useState<boolean>(false);
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string | null>(null);
   const todayOrLastWeekday = getLastWeekday();
   const [date, setDate] = useState<Date>(todayOrLastWeekday);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
@@ -510,11 +510,37 @@ export function TradingDashboard() {
 
                   <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
                     <Select
-                      label="Trading Strategy"
+                      label={
+                        <Group gap={5} justify="space-between">
+                          <span>Trading Strategy</span>
+                          <Tooltip label="Choose a trading strategy algorithm">
+                            <IconInfoCircle style={{ width: rem(14), height: rem(14) }} className="cursor-help" />
+                          </Tooltip>
+                        </Group>
+                      }
                       value={strategy}
                       onChange={(value) => setStrategy(value || 'macd')}
-                      data={STRATEGIES}
+                      data={loadingStrategies ? 
+                        [{ value: 'macd', label: 'Loading strategies...' }] : 
+                        strategies.map(s => ({
+                          value: s.id,
+                          label: s.name,
+                        }))}
                     />
+                    {!loadingStrategies && strategy && (
+                      <Text 
+                        size="xs" 
+                        mt="xs" 
+                        c="blue" 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          setSelectedStrategyId(strategy);
+                          setStrategyModalOpen(true);
+                        }}
+                      >
+                        Click for strategy information
+                      </Text>
+                    )}
                   </Grid.Col>
 
                   <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
@@ -730,6 +756,51 @@ export function TradingDashboard() {
           </Stack>
         </Container>
       </Box>
+
+      {/* Strategy Information Modal */}
+      <Modal 
+        opened={strategyModalOpen && selectedStrategyId !== null} 
+        onClose={() => setStrategyModalOpen(false)}
+        title={
+          <Text size="lg" fw={700}>
+            {strategies.find(s => s.id === selectedStrategyId)?.name} Details
+          </Text>
+        }
+        size="lg"
+      >
+        <Stack gap="md">
+          <Text fw={500} size="sm">Description</Text>
+          <Paper p="md" withBorder>
+            <Text size="sm">
+              {strategies.find(s => s.id === selectedStrategyId)?.description || ''}
+            </Text>
+          </Paper>
+          
+          <Text fw={500} size="sm" mt="md">Parameters</Text>
+          <Paper p="md" withBorder>
+            <Stack gap="md">
+              {strategies.find(s => s.id === selectedStrategyId)?.parameters.map((param, index) => (
+                <div key={param.name}>
+                  {index > 0 && <Divider my="xs" />}
+                  <Text fw={700} size="sm">{param.name}</Text>
+                  <Text size="sm">{param.description}</Text>
+                  <Text size="sm" c="dimmed">Default: {param.defaultValue}</Text>
+                  {param.options && param.options.length > 0 && (
+                    <>
+                      <Text size="sm" fw={500}>Options:</Text>
+                      <List size="sm" spacing="xs">
+                        {param.options.map(option => (
+                          <List.Item key={option}>{option}</List.Item>
+                        ))}
+                      </List>
+                    </>
+                  )}
+                </div>
+              ))}
+            </Stack>
+          </Paper>
+        </Stack>
+      </Modal>
     </MantineProvider>
   );
 }

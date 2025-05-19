@@ -237,12 +237,20 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         std::cout << "  DEBUG: " << timestamp << " - BUY Signal Check - MACD > Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " > " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (buySignal ? "TRUE" : "FALSE") << std::endl;
     }
     if (buySignal && position == 0) { // Only enter long if not currently in a position
-        double qty = cash / price; // Buy with all available cash
-        double cost = qty * price * (1 + transactionCostRate);
-        if (cash >= cost) {
-            cash -= cost;
-            trades.push_back({timeStep, "LONG", "BUY", price, static_cast<double>(qty)});
-            position += qty;
+        // Calculate quantity affordable after transaction costs
+        double qty_double = cash / (price * (1 + transactionCostRate));
+        if (qty_double <= 0) { // Avoid issues if cash is too low
+            qty_double = 0;
+        }
+        double qty = std::floor(qty_double); // Use floor to get whole shares
+
+        if (qty > 0) {
+            double cost = qty * price * (1 + transactionCostRate);
+            // This check should now be more robust, but an additional small epsilon might be needed for floating point issues
+            if (cash >= cost - 1e-9) { // Allow for tiny floating point discrepancies
+                cash -= cost;
+                trades.push_back({timeStep, "LONG", "BUY", price, static_cast<double>(qty)});
+                position += qty;
             entryPrice = price;
             std::cout << "DEBUG: " << timestamp << " - INFO: BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log BUY info
             debugDetailTicks = true;
@@ -272,17 +280,32 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         std::cout << "  DEBUG: " << timestamp << " - SHORT Signal Check - MACD < Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " < " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (shortSignal ? "TRUE" : "FALSE") << std::endl;
     }
     if (shortSignal && position == 0) { // Only enter short if not currently in a position
-        double qty = cash / price; // Short with a quantity equivalent to available cash
-        double cost = qty * price * (1 + transactionCostRate); // Cost is for borrowing/transaction
-         if (cash >= cost) { // Ensure enough cash for transaction cost
-            cash -= cost;
-            trades.push_back({timeStep, "SHORT", "SELL", price, static_cast<double>(qty)});
-            position -= qty; // Negative position for short
-            entryPrice = price;
-            std::cout << "DEBUG: " << timestamp << " - INFO: SELL (SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SHORT info
-            debugDetailTicks = true;
-        } else {
-            std::cout << "WARNING: Not enough cash for transaction cost to SELL (SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
+        // For shorting, qty isn't directly limited by cash in the same way as buying.
+        // Let's assume we want to size the short position similarly to how a long position might be sized.
+        // This part is a bit ambiguous in the original logic.
+        // A common approach is to size based on a fraction of portfolio or a fixed amount.
+        // Here, we'll keep it similar to the long entry for now, assuming 'cash / price' is a proxy for desired position size.
+        double qty_double = cash / price; // Still using this as a proxy for desired short size.
+                                         // This implies shorting an amount that, if it were a long position, would use up current cash.
+        if (qty_double <= 0) {
+            qty_double = 0;
+        }
+        double qty = std::floor(qty_double);
+
+        if (qty > 0) {
+            double transaction_fee = qty * price * transactionCostRate;
+            if (cash >= transaction_fee) { // Ensure cash can cover the transaction fee for shorting
+                cash -= transaction_fee; // Deduct transaction fee
+                // Note: For actual short selling, cash doesn't decrease by the value of shares,
+                // but margin might be required. This model simplifies that.
+                trades.push_back({timeStep, "SHORT", "SELL", price, static_cast<double>(qty)});
+                position -= qty; // Negative position for short
+                entryPrice = price;
+                std::cout << "DEBUG: " << timestamp << " - INFO: SELL (SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", transaction_fee: " << std::fixed << std::setprecision(2) << transaction_fee << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SHORT info
+                debugDetailTicks = true;
+            } else {
+                std::cout << "WARNING: Not enough cash for transaction fee to SELL (SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", transaction_fee: " << std::fixed << std::setprecision(2) << transaction_fee << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
+            }
         }
     }
 

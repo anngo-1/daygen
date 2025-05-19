@@ -327,7 +327,6 @@ export function TradingChart({ data }: TradingChartProps) {
     annotation: {
       annotations: enrichedData.reduce<TradeAnnotation[]>((annotations, point, index) => {
         if (point.trade) {
-          const isEntry = point.trade.type === 'LONG' || point.trade.type === 'SHORT';
           const isLong = point.trade.type === 'LONG' || point.trade.type === 'EXIT_SHORT'; // Green for long entry and short exit
           const yValue = activeTab === 'price' ? point.price : point.indicators.portfolio_value;
 

@@ -119,18 +119,20 @@ SimulationResult MeanReversionStrategy::execute(const MarketData& data, double i
         double proceeds = position * finalPrice * (1 - transactionCostRate);
         cash += proceeds;
         trades.push_back({static_cast<int>(data.prices.size()-1),
-                         "SELL (End Session)",
+                         "EXIT_LONG",
+                         "SELL",
                          finalPrice,
-                         position});
+                         static_cast<double>(position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: End of session, liquidated position at price " << finalPrice << ", proceeds: " << proceeds << std::endl;
     } else if (position < 0) {
         double finalPrice = data.prices.back();
         double cost = -position * finalPrice * (1 + transactionCostRate);
         cash -= cost;
         trades.push_back({static_cast<int>(data.prices.size()-1),
-                         "BUY (End Session)",
+                         "EXIT_SHORT",
+                         "BUY",
                          finalPrice,
-                         -position});
+                         static_cast<double>(-position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: End of session, covered short position at price " << finalPrice << ", cost: " << cost << std::endl;
     }
 
@@ -210,7 +212,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
         currentZScore, // Using MACD field for z-score
         0.0,           // Not using signal field
         cash + (position * price),  // current portfolio value
-        position,
+        static_cast<double>(position),
         cash,
         currentMean,   // Using trend field for mean
         currentStdDev  // Using volatility field for std dev
@@ -243,7 +245,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
         if (price < entryPrice * (1 - stopLossPct)) {
             double proceeds = position * price * (1 - transactionCostRate);
             cash += proceeds;
-            trades.push_back({timeStep, "SELL (Stop Loss)", price, position});
+            trades.push_back({timeStep, "EXIT_LONG", "SELL", price, static_cast<double>(position)});
             std::cout << "DEBUG: " << timestamp << " - INFO: STOP LOSS triggered at " << std::fixed << std::setprecision(2) << price
                       << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << std::endl;
             position = 0;
@@ -256,7 +258,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
         if (price > entryPrice * (1 + profitTargetPct)) {
             double proceeds = position * price * (1 - transactionCostRate);
             cash += proceeds;
-            trades.push_back({timeStep, "SELL (Profit Target)", price, position});
+            trades.push_back({timeStep, "EXIT_LONG", "SELL", price, static_cast<double>(position)});
             std::cout << "DEBUG: " << timestamp << " - INFO: PROFIT TARGET reached at " << std::fixed << std::setprecision(2) << price
                       << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << std::endl;
             position = 0;
@@ -270,7 +272,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
         if (price > entryPrice * (1 + stopLossPct)) {
             double cost = -position * price * (1 + transactionCostRate);
             cash -= cost;
-            trades.push_back({timeStep, "BUY (Stop Loss)", price, -position});
+            trades.push_back({timeStep, "EXIT_SHORT", "BUY", price, static_cast<double>(-position)});
             std::cout << "DEBUG: " << timestamp << " - INFO: STOP LOSS triggered at " << std::fixed << std::setprecision(2) << price
                       << ", qty: " << -position << ", cost: " << std::fixed << std::setprecision(2) << cost << std::endl;
             position = 0;
@@ -283,7 +285,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
         if (price < entryPrice * (1 - profitTargetPct)) {
             double cost = -position * price * (1 + transactionCostRate);
             cash -= cost;
-            trades.push_back({timeStep, "BUY (Profit Target)", price, -position});
+            trades.push_back({timeStep, "EXIT_SHORT", "BUY", price, static_cast<double>(-position)});
             std::cout << "DEBUG: " << timestamp << " - INFO: PROFIT TARGET reached at " << std::fixed << std::setprecision(2) << price
                       << ", qty: " << -position << ", cost: " << std::fixed << std::setprecision(2) << cost << std::endl;
             position = 0;
@@ -302,7 +304,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
             cash -= cost;
             position = qty;
             entryPrice = price;
-            trades.push_back({timeStep, "BUY (Entry)", price, qty});
+            trades.push_back({timeStep, "LONG", "BUY", price, static_cast<double>(qty)});
             std::cout << "DEBUG: " << timestamp << " - INFO: BUY (Oversold) at " << std::fixed << std::setprecision(2) << price
                       << ", qty: " << qty << ", z-score: " << std::fixed << std::setprecision(2) << currentZScore
                       << ", cost: " << std::fixed << std::setprecision(2) << cost << std::endl;
@@ -317,7 +319,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
             cash += proceeds;
             position = -qty; // Negative for short position
             entryPrice = price;
-            trades.push_back({timeStep, "SELL (Enter Short)", price, qty});
+            trades.push_back({timeStep, "SHORT", "SELL", price, static_cast<double>(qty)});
             std::cout << "DEBUG: " << timestamp << " - INFO: SELL (Overbought) at " << std::fixed << std::setprecision(2) << price
                       << ", qty: " << qty << ", z-score: " << std::fixed << std::setprecision(2) << currentZScore
                       << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << std::endl;
@@ -328,7 +330,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
     else if (position > 0 && std::abs(currentZScore) < exitThreshold) {
         double proceeds = position * price * (1 - transactionCostRate);
         cash += proceeds;
-        trades.push_back({timeStep, "SELL (Exit Long)", price, position});
+        trades.push_back({timeStep, "EXIT_LONG", "SELL", price, static_cast<double>(position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: EXIT LONG at " << std::fixed << std::setprecision(2) << price
                   << ", qty: " << position << ", z-score: " << std::fixed << std::setprecision(2) << currentZScore
                   << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << std::endl;
@@ -340,7 +342,7 @@ void MeanReversionStrategy::onTick(double price, int timeStep, const std::string
     else if (position < 0 && std::abs(currentZScore) < exitThreshold) {
         double cost = -position * price * (1 + transactionCostRate);
         cash -= cost;
-        trades.push_back({timeStep, "BUY (Exit Short)", price, -position});
+        trades.push_back({timeStep, "EXIT_SHORT", "BUY", price, static_cast<double>(-position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: EXIT SHORT at " << std::fixed << std::setprecision(2) << price
                   << ", qty: " << -position << ", z-score: " << std::fixed << std::setprecision(2) << currentZScore
                   << ", cost: " << std::fixed << std::setprecision(2) << cost << std::endl;

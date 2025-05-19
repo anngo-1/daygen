@@ -103,9 +103,10 @@ SimulationResult RandomStrategy::execute(const MarketData& data, double initialC
         double proceeds = position * finalPrice * (1 - transactionCostRate);
         cash += proceeds;
         trades.push_back({static_cast<int>(data.prices.size()-1),
+                         "EXIT_LONG",
                          "SELL",
                          finalPrice,
-                         position});
+                         static_cast<double>(position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: End of session, liquidated position at price " << finalPrice << ", proceeds: " << proceeds << std::endl;
     }
 
@@ -149,7 +150,7 @@ void RandomStrategy::onTick(double price, int timeStep, const std::string& tickT
     if (clearAtEndOfDay && isNewDay && position > 0) {
         double proceeds = position * price * (1 - transactionCostRate);
         cash += proceeds;
-        trades.push_back({timeStep, "SELL", price, position});
+        trades.push_back({timeStep, "EXIT_LONG", "SELL", price, static_cast<double>(position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: End of day " << currentDay << ", liquidated position at price " << std::fixed << std::setprecision(2) << price << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << std::endl;
         position = 0;
     }
@@ -159,7 +160,7 @@ void RandomStrategy::onTick(double price, int timeStep, const std::string& tickT
         0.0, // No MACD in this strategy
         0.0, // No signal in this strategy
         cash + (position * price),  // current portfolio value
-        position,
+        static_cast<double>(position),
         cash,
         0.0, // No trend in this strategy  
         0.0  // No volatility in this strategy
@@ -199,7 +200,7 @@ void RandomStrategy::onTick(double price, int timeStep, const std::string& tickT
                 if (cash >= cost) {
                     cash -= cost;
                     position += qty;
-                    trades.push_back({timeStep, "BUY", price, qty});
+                    trades.push_back({timeStep, "LONG", "BUY", price, static_cast<double>(qty)});
                     std::cout << "DEBUG: " << timestamp << " - INFO: RANDOM BUY at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
                     debugDetailTicks = true;
                 }
@@ -229,7 +230,7 @@ void RandomStrategy::onTick(double price, int timeStep, const std::string& tickT
                     double proceeds = sellQty * price * (1 - transactionCostRate);
                     cash += proceeds;
                     position -= sellQty;
-                    trades.push_back({timeStep, "SELL", price, sellQty});
+                    trades.push_back({timeStep, "EXIT_LONG", "SELL", price, static_cast<double>(sellQty)});
                     std::cout << "DEBUG: " << timestamp << " - INFO: COIN FLIP SELL at " << std::fixed << std::setprecision(2) << price << ", qty: " << sellQty << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
                     debugDetailTicks = true;
                 }

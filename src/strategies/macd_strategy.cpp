@@ -38,7 +38,7 @@ MACDStrategy::MACDStrategy(double volEstimate,
     , trades()
     , historicalData()
     , cash(0)
-    , position(0)
+    , position(0.0) // Changed to double
     , stopLossPct(stopLossPercentage)
     , transactionCostRate(transactionCost)
     , entryPrice(0.0)
@@ -125,15 +125,31 @@ SimulationResult MACDStrategy::execute(const MarketData& data, double initialCas
         onTick(data.prices[i], i, data.timestamps[i]); // Pass timestamp
     }
 
-    if (position > 0) {
+    if (position != 0) { // Check if any position (long or short)
         double finalPrice = data.prices.back();
-        double proceeds = position * finalPrice * (1 - transactionCostRate);
-        cash += proceeds;
+        double quantity = std::abs(position);
+        std::string tradeType = (position > 0) ? "EXIT_LONG" : "EXIT_SHORT";
+        std::string tradeSide = (position > 0) ? "SELL" : "BUY";
+        double proceeds = 0.0;
+
+        if (position > 0) { // Exiting long
+            proceeds = quantity * finalPrice * (1 - transactionCostRate);
+            cash += proceeds;
+        } else { // Exiting short
+            // Need the entry price for calculating profit/loss on short
+            // This assumes entryPrice is still set from the last entry trade.
+            // A more robust solution might store entry price per position.
+            // For now, using the last entryPrice.
+            proceeds = quantity * (entryPrice - finalPrice) * (1 - transactionCostRate);
+            cash += proceeds;
+        }
+
         trades.push_back({static_cast<int>(data.prices.size()-1),
-                         "SELL (End Session)",
+                         tradeType,
+                         tradeSide,
                          finalPrice,
-                         position});
-        std::cout << "DEBUG: " << timestamp << " - INFO: End of session, liquidated position at price " << finalPrice << ", proceeds: " << proceeds << std::endl;
+                         quantity});
+        std::cout << "DEBUG: " << timestamp << " - INFO: End of session, liquidated position (" << tradeType << ") at price " << finalPrice << ", quantity: " << quantity << ", proceeds: " << proceeds << std::endl;
     }
 
     std::cout << "DEBUG: " << timestamp << " - INFO: Strategy execution completed." << std::endl;
@@ -193,7 +209,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         currentMACD,
         currentSignal,
         cash + (position * price),  // current portfolio value
-        position,
+        static_cast<double>(position),
         cash,
         currentTrend,
         currentSigma
@@ -225,7 +241,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         double cost = qty * price * (1 + transactionCostRate);
         if (cash >= cost) {
             cash -= cost;
-            trades.push_back({timeStep, "LONG", "BUY", price, qty});
+            trades.push_back({timeStep, "LONG", "BUY", price, static_cast<double>(qty)});
             position += qty;
             entryPrice = price;
             std::cout << "DEBUG: " << timestamp << " - INFO: BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log BUY info
@@ -243,7 +259,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
     if (sellSignal && position > 0) { // Only exit long if currently in a long position
         double proceeds = position * price * (1 - transactionCostRate);
         cash += proceeds;
-        trades.push_back({timeStep, "EXIT_LONG", "SELL", price, position});
+        trades.push_back({timeStep, "EXIT_LONG", "SELL", price, static_cast<double>(position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: SELL (EXIT LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SELL info
         position = 0;
         entryPrice = 0.0;
@@ -260,7 +276,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         double cost = qty * price * (1 + transactionCostRate); // Cost is for borrowing/transaction
          if (cash >= cost) { // Ensure enough cash for transaction cost
             cash -= cost;
-            trades.push_back({timeStep, "SHORT", "SELL", price, qty});
+            trades.push_back({timeStep, "SHORT", "SELL", price, static_cast<double>(qty)});
             position -= qty; // Negative position for short
             entryPrice = price;
             std::cout << "DEBUG: " << timestamp << " - INFO: SELL (SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SHORT info
@@ -278,7 +294,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
     if (exitShortSignal && position < 0) { // Only exit short if currently in a short position
         double proceeds = std::abs(position) * (entryPrice - price) * (1 - transactionCostRate); // Profit/Loss on short position
         cash += proceeds; // Add profit/loss to cash
-        trades.push_back({timeStep, "EXIT_SHORT", "BUY", price, std::abs(position)});
+        trades.push_back({timeStep, "EXIT_SHORT", "BUY", price, static_cast<double>(std::abs(position))});
         std::cout << "DEBUG: " << timestamp << " - INFO: BUY (EXIT SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << std::abs(position) << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log EXIT SHORT info
         position = 0;
         entryPrice = 0.0;
@@ -312,7 +328,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
                  cash += proceeds;
             }
 
-            trades.push_back({timeStep, (position > 0 ? "EXIT_LONG" : "EXIT_SHORT"), (position > 0 ? "SELL" : "BUY"), price, quantity});
+            trades.push_back({timeStep, (position > 0 ? "EXIT_LONG" : "EXIT_SHORT"), (position > 0 ? "SELL" : "BUY"), price, static_cast<double>(quantity)});
             std::cout << "DEBUG: " << timestamp << " - INFO: STOP LOSS triggered (" << tradeType << ") at " << std::fixed << std::setprecision(2) << price << ", qty: " << quantity << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log STOP LOSS info
             position = 0;
             entryPrice = 0.0;

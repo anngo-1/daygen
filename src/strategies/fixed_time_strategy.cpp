@@ -25,7 +25,7 @@ FixedTimeStrategy::FixedTimeStrategy(int holdingPeriodMinutes,
     , historicalData()
     , positionStartTimes()
     , cash(0)
-    , position(0)
+    , position(0.0) // Changed to double
     , transactionCostRate(transactionCost)
     , lastPrice(0.0)
     , debugDetailTicks(false)
@@ -171,9 +171,10 @@ SimulationResult FixedTimeStrategy::execute(const MarketData& data, double initi
         double proceeds = position * finalPrice * (1 - transactionCostRate);
         cash += proceeds;
         trades.push_back({static_cast<int>(data.prices.size()-1),
-                         "SELL (End Session)",
+                         "EXIT_LONG", // Type
+                         "SELL", // Side
                          finalPrice,
-                         position});
+                         static_cast<double>(position)});
         std::cout << "DEBUG: " << timestamp << " - INFO: End of session, liquidated position at price " << finalPrice << ", proceeds: " << proceeds << std::endl;
     }
 
@@ -208,7 +209,7 @@ void FixedTimeStrategy::onTick(double price, int timeStep, const std::string& ti
         0.0, // Not using MACD field
         0.0, // Not using signal field
         cash + (position * price),  // current portfolio value
-        position,
+        static_cast<double>(position),
         cash,
         0.0, // Not using trend field
         0.0  // Not using volatility field
@@ -243,7 +244,7 @@ void FixedTimeStrategy::onTick(double price, int timeStep, const std::string& ti
             if (minutesHeld >= holdingPeriodMinutes) {
                 double proceeds = position * price * (1 - transactionCostRate);
                 cash += proceeds;
-                trades.push_back({timeStep, "SELL (Time Limit)", price, position});
+                trades.push_back({timeStep, "EXIT_LONG", "SELL", price, static_cast<double>(position)});
                 std::cout << "DEBUG: " << timestamp << " - INFO: SELL after " << minutesHeld << " minutes at " << std::fixed << std::setprecision(2) << price
                           << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << std::endl;
                 
@@ -272,7 +273,7 @@ void FixedTimeStrategy::onTick(double price, int timeStep, const std::string& ti
                 cash -= cost;
                 position = qty;
                 positionStartTimes[position] = tickTimestamp;
-                trades.push_back({timeStep, "BUY", price, qty});
+                trades.push_back({timeStep, "LONG", "BUY", price, static_cast<double>(qty)}); // Cast qty to double
                 std::cout << "DEBUG: " << timestamp << " - INFO: BUY at " << std::fixed << std::setprecision(2) << price
                           << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost 
                           << ", time: " << tickTimestamp << std::endl;

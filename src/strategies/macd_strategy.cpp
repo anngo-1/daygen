@@ -251,11 +251,12 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
                 cash -= cost;
                 trades.push_back({timeStep, "LONG", "BUY", price, static_cast<double>(qty)});
                 position += qty;
-            entryPrice = price;
-            std::cout << "DEBUG: " << timestamp << " - INFO: BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log BUY info
-            debugDetailTicks = true;
-        } else {
-            std::cout << "WARNING: Not enough cash to BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
+                entryPrice = price;
+                std::cout << "DEBUG: " << timestamp << " - INFO: BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log BUY info
+                debugDetailTicks = true;
+            } else {
+                std::cout << "WARNING: Not enough cash to BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
+            }
         }
     }
 

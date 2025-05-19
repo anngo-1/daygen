@@ -39,7 +39,7 @@ export function TradeHistory({ trades, historicalData }: TradeHistoryProps) {
             variant="light"
             style={{ minWidth: '120px', display: 'inline-block', textAlign: 'center' }} // Adjusted width for longer text
           >
-            {trade.type.replace('_', ' ')} {trade.side}
+            {typeof trade.type === 'string' ? trade.type.replace('_', ' ') : 'N/A'} {typeof trade.side === 'string' ? trade.side : ''}
           </Badge>
         </Table.Td>
         <Table.Td ta="right">

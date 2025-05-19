@@ -143,7 +143,9 @@ std::string TradingServer::handleSimulate(const httplib::Request& req, httplib::
                 {"signal", result.historical[i].signal},
                 {"portfolio_value", result.historical[i].portfolioValue},
                 {"position", result.historical[i].position},
-                {"cash", result.historical[i].cash}
+                {"cash", result.historical[i].cash},
+                {"trend", result.historical[i].trend},
+                {"volatility", result.historical[i].volatility}
             };
 
             auto trade_it = std::find_if(result.trades.begin(), result.trades.end(),
@@ -165,6 +167,7 @@ std::string TradingServer::handleSimulate(const httplib::Request& req, httplib::
         for (const auto& trade : result.trades) {
             response["trades"].push_back({
                 {"time_step", trade.timeStep},
+                {"type", trade.type},
                 {"side", trade.side},
                 {"price", trade.price},
                 {"quantity", trade.quantity}

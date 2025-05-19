@@ -326,14 +326,20 @@ export function TradingChart({ data }: TradingChartProps) {
   const tradeAnnotations = {
     annotation: {
       annotations: enrichedData.reduce<TradeAnnotation[]>((annotations, point, index) => {
-        if (point.trade && typeof point.trade.type === 'string') {
-          const isLong = point.trade.type === 'LONG' || point.trade.type === 'EXIT_SHORT'; // Green for long entry and short exit
+        if (point.trade && 
+            typeof point.trade === 'object' && 
+            point.trade !== null && 
+            typeof point.trade.type === 'string' &&
+            typeof point.trade.price === 'number' && // ensure price is also valid for yValue
+            typeof point.indicators.portfolio_value === 'number' // ensure portfolio_value is valid for yValue
+        ) {
+          const isLong = point.trade.type === 'LONG' || point.trade.type === 'EXIT_SHORT';
           const yValue = activeTab === 'price' ? point.price : point.indicators.portfolio_value;
 
           annotations.push({
             type: 'point',
             xValue: index,
-            yValue,
+            yValue: yValue, // Ensure yValue is valid
             borderColor: isLong ? 'lime' : 'magenta',
             backgroundColor: isLong ? 'green' : 'red',
             borderWidth: 0,
@@ -347,10 +353,10 @@ export function TradingChart({ data }: TradingChartProps) {
             value: index,
             borderColor: isLong ? 'rgba(0, 200, 0, 0.7)' : 'rgba(200, 0, 0, 0.7)',
             borderWidth: 1,
-            label: {
-              content: point.trade.type.replace('_', ' '), // Use trade type for label
-              display: false, // Keep label display false for now, can enable later if needed
-            },
+            // label: { // Temporarily remove label to isolate the issue
+            //   content: point.trade.type.replace('_', ' '),
+            //   display: false, 
+            // },
           });
         }
         return annotations;

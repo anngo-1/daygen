@@ -294,11 +294,11 @@ export function TradingChart({ data }: TradingChartProps) {
               lines.push(`P/L: ${isPointProfit ? '▲ +' : '▼ -'}${profitFormatted} (${point.profitPercentage.toFixed(2)}%)`);
             }
             
-            if (point.trade && context.dataset.label === 'Price') {
+            if (point.trade && typeof point.trade.side === 'string' && typeof point.trade.price === 'number' && context.dataset.label === 'Price') {
               const isBuy = point.trade.side === 'BUY';
               lines.push(`${isBuy ? '▲ Buy' : '▼ Sell'}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(point.trade.price)}`);
               
-              if (point.trade.quantity) {
+              if (typeof point.trade.quantity === 'number') {
                 lines.push(`Size: ${point.trade.quantity} shares`);
                 const tradeValue = point.trade.quantity * point.trade.price;
                 lines.push(`Value: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(tradeValue)}`);
@@ -326,7 +326,7 @@ export function TradingChart({ data }: TradingChartProps) {
   const tradeAnnotations = {
     annotation: {
       annotations: enrichedData.reduce<TradeAnnotation[]>((annotations, point, index) => {
-        if (point.trade) {
+        if (point.trade && typeof point.trade.type === 'string') {
           const isLong = point.trade.type === 'LONG' || point.trade.type === 'EXIT_SHORT'; // Green for long entry and short exit
           const yValue = activeTab === 'price' ? point.price : point.indicators.portfolio_value;
 

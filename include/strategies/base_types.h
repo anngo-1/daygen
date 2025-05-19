@@ -6,16 +6,17 @@ namespace trading {
 
 struct Trade {
     int timeStep;
-    std::string side;
+    std::string type; // "LONG", "SHORT", "EXIT_LONG", "EXIT_SHORT"
+    std::string side; // "BUY", "SELL"
     double price;
-    int quantity;
+    double quantity; // Use double for quantity to handle partial fills or more precise shorting
 };
 
 struct HistoricalDataPoint {
     double macd;
     double signal;
     double portfolioValue;
-    int position;
+    double position; // Use double to represent long (positive) or short (negative) positions
     double cash;
     double trend;
     double volatility;

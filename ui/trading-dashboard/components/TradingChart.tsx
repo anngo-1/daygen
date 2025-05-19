@@ -327,15 +327,16 @@ export function TradingChart({ data }: TradingChartProps) {
     annotation: {
       annotations: enrichedData.reduce<TradeAnnotation[]>((annotations, point, index) => {
         if (point.trade) {
-          const isBuy = point.trade.side === 'BUY';
+          const isEntry = point.trade.type === 'LONG' || point.trade.type === 'SHORT';
+          const isLong = point.trade.type === 'LONG' || point.trade.type === 'EXIT_SHORT'; // Green for long entry and short exit
           const yValue = activeTab === 'price' ? point.price : point.indicators.portfolio_value;
 
           annotations.push({
             type: 'point',
             xValue: index,
             yValue,
-            borderColor: isBuy ? 'lime' : 'magenta',
-            backgroundColor: isBuy ? 'green' : 'red',
+            borderColor: isLong ? 'lime' : 'magenta',
+            backgroundColor: isLong ? 'green' : 'red',
             borderWidth: 0,
             pointStyle: 'circle',
             radius: 5,
@@ -345,11 +346,11 @@ export function TradingChart({ data }: TradingChartProps) {
             mode: 'vertical',
             scaleID: 'x',
             value: index,
-            borderColor: isBuy ? 'rgba(0, 200, 0, 0.7)' : 'rgba(200, 0, 0, 0.7)',
+            borderColor: isLong ? 'rgba(0, 200, 0, 0.7)' : 'rgba(200, 0, 0, 0.7)',
             borderWidth: 1,
             label: {
-              content: point.trade.side === 'BUY' ? 'Buy' : 'Sell',
-              display: false,
+              content: point.trade.type.replace('_', ' '), // Use trade type for label
+              display: false, // Keep label display false for now, can enable later if needed
             },
           });
         }

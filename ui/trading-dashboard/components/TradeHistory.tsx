@@ -35,11 +35,11 @@ export function TradeHistory({ trades, historicalData }: TradeHistoryProps) {
         </Table.Td>
         <Table.Td>
           <Badge
-            color={trade.side.includes('BUY') ? 'green' : 'red'}
+            color={trade.type.includes('LONG') ? 'green' : 'red'}
             variant="light"
-            style={{ minWidth: '60px', display: 'inline-block', textAlign: 'center' }} // Added style for mobile badge
+            style={{ minWidth: '80px', display: 'inline-block', textAlign: 'center' }} // Adjusted width for longer text
           >
-            {trade.side}
+            {trade.type.replace('_', ' ')} {/* Replace underscore with space for display */}
           </Badge>
         </Table.Td>
         <Table.Td ta="right">

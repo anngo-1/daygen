@@ -1,11 +1,9 @@
 export interface Trade {
-    profit_loss: number;
     time_step: number;
-    side: string;
+    type: string; // "LONG", "SHORT", "EXIT_LONG", "EXIT_SHORT"
+    side: string; // "BUY", "SELL"
     price: number;
     quantity: number;
-    timestamp?: string;
-    portfolio_value_after?: number;
   }
 
   export interface HistoricalDataPoint {
@@ -15,16 +13,12 @@ export interface Trade {
       macd: number;
       signal: number;
       portfolio_value: number;
-      position: number;
+      position: number; // Use number to represent long (positive) or short (negative) positions
       cash: number;
       trend: number;
       volatility: number;
     };
-    trade?: {
-      side: string;
-      quantity: number;
-      price: number;
-    };
+    trade?: Trade; // Use the updated Trade interface
   }
 
   export interface TradingData {

@@ -215,57 +215,105 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         std::cout << "  DEBUG: " << timestamp << " - Buy Threshold: " << std::fixed << std::setprecision(2) << buyThreshold << ", Sell Threshold: " << std::fixed << std::setprecision(2) << sellThreshold << std::endl; // Log thresholds
     }
 
-    // MACD crossover buy signal
+    // MACD crossover buy signal (for entering long position)
     bool buySignal = (currentMACD > currentSignal);
     if (timeStep % 10 == 0 || debugDetailTicks) {
         std::cout << "  DEBUG: " << timestamp << " - BUY Signal Check - MACD > Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " > " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (buySignal ? "TRUE" : "FALSE") << std::endl;
     }
-    if (buySignal) {
-        if (position == 0) {
-            int qty = 100; // Example fixed quantity
-            double cost = qty * price * (1 + transactionCostRate);
-            if (cash >= cost) {
-                cash -= cost;
-                trades.push_back({timeStep, "BUY (Entry)", price, qty});
-                position += qty;
-                entryPrice = price;
-                std::cout << "DEBUG: " << timestamp << " - INFO: BUY at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log BUY info
-                debugDetailTicks = true;
-            } else {
-                std::cout << "WARNING: Not enough cash to BUY at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
-            }
+    if (buySignal && position == 0) { // Only enter long if not currently in a position
+        double qty = cash / price; // Buy with all available cash
+        double cost = qty * price * (1 + transactionCostRate);
+        if (cash >= cost) {
+            cash -= cost;
+            trades.push_back({timeStep, "LONG", "BUY", price, qty});
+            position += qty;
+            entryPrice = price;
+            std::cout << "DEBUG: " << timestamp << " - INFO: BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log BUY info
+            debugDetailTicks = true;
+        } else {
+            std::cout << "WARNING: Not enough cash to BUY (LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
         }
     }
 
-    // MACD crossover sell signal
+    // MACD crossover sell signal (for exiting long position)
     bool sellSignal = (currentMACD < currentSignal);
      if (timeStep % 10 == 0 || debugDetailTicks) {
         std::cout << "  DEBUG: " << timestamp << " - SELL Signal Check - MACD < Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " < " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (sellSignal ? "TRUE" : "FALSE") << std::endl;
     }
-    if (sellSignal) {
-        if (position > 0) {
-            double proceeds = position * price * (1 - transactionCostRate);
-            cash += proceeds;
-            trades.push_back({timeStep, "SELL (Exit Long)", price, position});
-            std::cout << "DEBUG: " << timestamp << " - INFO: SELL at " << std::fixed << std::setprecision(2) << price << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SELL info
-            position = 0;
-            entryPrice = 0.0;
+    if (sellSignal && position > 0) { // Only exit long if currently in a long position
+        double proceeds = position * price * (1 - transactionCostRate);
+        cash += proceeds;
+        trades.push_back({timeStep, "EXIT_LONG", "SELL", price, position});
+        std::cout << "DEBUG: " << timestamp << " - INFO: SELL (EXIT LONG) at " << std::fixed << std::setprecision(2) << price << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SELL info
+        position = 0;
+        entryPrice = 0.0;
+        debugDetailTicks = true;
+    }
+
+    // MACD crossover sell signal (for entering short position)
+    bool shortSignal = (currentMACD < currentSignal);
+    if (timeStep % 10 == 0 || debugDetailTicks) {
+        std::cout << "  DEBUG: " << timestamp << " - SHORT Signal Check - MACD < Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " < " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (shortSignal ? "TRUE" : "FALSE") << std::endl;
+    }
+    if (shortSignal && position == 0) { // Only enter short if not currently in a position
+        double qty = cash / price; // Short with a quantity equivalent to available cash
+        double cost = qty * price * (1 + transactionCostRate); // Cost is for borrowing/transaction
+         if (cash >= cost) { // Ensure enough cash for transaction cost
+            cash -= cost;
+            trades.push_back({timeStep, "SHORT", "SELL", price, qty});
+            position -= qty; // Negative position for short
+            entryPrice = price;
+            std::cout << "DEBUG: " << timestamp << " - INFO: SELL (SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SHORT info
             debugDetailTicks = true;
+        } else {
+            std::cout << "WARNING: Not enough cash for transaction cost to SELL (SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
         }
+    }
+
+    // MACD crossover buy signal (for exiting short position)
+    bool exitShortSignal = (currentMACD > currentSignal);
+    if (timeStep % 10 == 0 || debugDetailTicks) {
+        std::cout << "  DEBUG: " << timestamp << " - EXIT SHORT Signal Check - MACD > Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " > " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (exitShortSignal ? "TRUE" : "FALSE") << std::endl;
+    }
+    if (exitShortSignal && position < 0) { // Only exit short if currently in a short position
+        double proceeds = std::abs(position) * (entryPrice - price) * (1 - transactionCostRate); // Profit/Loss on short position
+        cash += proceeds; // Add profit/loss to cash
+        trades.push_back({timeStep, "EXIT_SHORT", "BUY", price, std::abs(position)});
+        std::cout << "DEBUG: " << timestamp << " - INFO: BUY (EXIT SHORT) at " << std::fixed << std::setprecision(2) << price << ", qty: " << std::abs(position) << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log EXIT SHORT info
+        position = 0;
+        entryPrice = 0.0;
+        debugDetailTicks = true;
     }
 
 
     // stop loss check
-    if (position > 0 && entryPrice > 0) {
-        bool stopLossCondition = (price < entryPrice * (1 - stopLossPct));
+    if (position != 0 && entryPrice > 0) {
+        bool stopLossCondition = false;
+        std::string tradeType = "";
+        if (position > 0) { // Long position stop loss
+            stopLossCondition = (price < entryPrice * (1 - stopLossPct));
+            tradeType = "SELL (Stop Loss Long)";
+        } else { // Short position stop loss
+            stopLossCondition = (price > entryPrice * (1 + stopLossPct));
+            tradeType = "BUY (Stop Loss Short)";
+        }
+
          if (timeStep % 10 == 0 || debugDetailTicks) {
-            std::cout << "  DEBUG: " << timestamp << " - STOP LOSS Conditions Check - Price < Stop Loss Level (" << std::fixed << std::setprecision(2) << entryPrice * (1 - stopLossPct) << "): (" << std::fixed << std::setprecision(2) << price << " < " << std::fixed << std::setprecision(2) << entryPrice * (1 - stopLossPct) << ") - " << (price < entryPrice * (1 - stopLossPct) ? "TRUE" : "FALSE") << std::endl;
+            std::cout << "  DEBUG: " << timestamp << " - STOP LOSS Conditions Check - " << tradeType << ": " << (stopLossCondition ? "TRUE" : "FALSE") << std::endl;
         }
         if (stopLossCondition) {
-            double proceeds = position * price * (1 - transactionCostRate);
-            cash += proceeds;
-            trades.push_back({timeStep, "SELL (Stop Loss)", price, position});
-            std::cout << "DEBUG: " << timestamp << " - INFO: STOP LOSS triggered at " << std::fixed << std::setprecision(2) << price << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log STOP LOSS info
+            double quantity = std::abs(position);
+            double proceeds = 0.0;
+            if (position > 0) { // Exiting long stop loss
+                 proceeds = quantity * price * (1 - transactionCostRate);
+                 cash += proceeds;
+            } else { // Exiting short stop loss
+                 proceeds = quantity * (entryPrice - price) * (1 - transactionCostRate);
+                 cash += proceeds;
+            }
+
+            trades.push_back({timeStep, (position > 0 ? "EXIT_LONG" : "EXIT_SHORT"), (position > 0 ? "SELL" : "BUY"), price, quantity});
+            std::cout << "DEBUG: " << timestamp << " - INFO: STOP LOSS triggered (" << tradeType << ") at " << std::fixed << std::setprecision(2) << price << ", qty: " << quantity << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log STOP LOSS info
             position = 0;
             entryPrice = 0.0;
             debugDetailTicks = true;

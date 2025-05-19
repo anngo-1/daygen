@@ -215,15 +215,14 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         std::cout << "  DEBUG: " << timestamp << " - Buy Threshold: " << std::fixed << std::setprecision(2) << buyThreshold << ", Sell Threshold: " << std::fixed << std::setprecision(2) << sellThreshold << std::endl; // Log thresholds
     }
 
-    // MACD crossover with trend confirmation
-    bool buyCondition = (currentMACD > currentSignal) && (price < buyThreshold);
+    // MACD crossover buy signal
+    bool buySignal = (currentMACD > currentSignal);
     if (timeStep % 10 == 0 || debugDetailTicks) {
-        std::cout << "  DEBUG: " << timestamp << " - BUY Conditions Check - MACD > Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " > " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (currentMACD > currentSignal ? "TRUE" : "FALSE")
-                  << ", Price < Buy Threshold (" << std::fixed << std::setprecision(2) << buyThreshold << "): (" << std::fixed << std::setprecision(2) << price << " < " << std::fixed << std::setprecision(2) << buyThreshold << ") - " << (price < buyThreshold ? "TRUE" : "FALSE") << std::endl;
+        std::cout << "  DEBUG: " << timestamp << " - BUY Signal Check - MACD > Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " > " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (buySignal ? "TRUE" : "FALSE") << std::endl;
     }
-    if (buyCondition) {
+    if (buySignal) {
         if (position == 0) {
-            int qty = 100;
+            int qty = 100; // Example fixed quantity
             double cost = qty * price * (1 + transactionCostRate);
             if (cash >= cost) {
                 cash -= cost;
@@ -235,17 +234,15 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
             } else {
                 std::cout << "WARNING: Not enough cash to BUY at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ". Current cash: " << std::fixed << std::setprecision(2) << cash << std::endl;
             }
-
         }
     }
 
-
-    bool sellCondition = (currentMACD < currentSignal) || (price > sellThreshold);
+    // MACD crossover sell signal
+    bool sellSignal = (currentMACD < currentSignal);
      if (timeStep % 10 == 0 || debugDetailTicks) {
-        std::cout << "  DEBUG: " << timestamp << " - SELL Conditions Check - MACD < Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " < " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (currentMACD < currentSignal ? "TRUE" : "FALSE")
-                  << ", Price > Sell Threshold (" << std::fixed << std::setprecision(2) << sellThreshold << "): (" << std::fixed << std::setprecision(2) << price << " > " << std::fixed << std::setprecision(2) << sellThreshold << ") - " << (price > sellThreshold ? "TRUE" : "FALSE") << std::endl;
+        std::cout << "  DEBUG: " << timestamp << " - SELL Signal Check - MACD < Signal: (" << std::fixed << std::setprecision(6) << currentMACD << " < " << std::fixed << std::setprecision(6) << currentSignal << ") - " << (sellSignal ? "TRUE" : "FALSE") << std::endl;
     }
-    if (sellCondition) {
+    if (sellSignal) {
         if (position > 0) {
             double proceeds = position * price * (1 - transactionCostRate);
             cash += proceeds;
@@ -254,7 +251,6 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
             position = 0;
             entryPrice = 0.0;
             debugDetailTicks = true;
-
         }
     }
 

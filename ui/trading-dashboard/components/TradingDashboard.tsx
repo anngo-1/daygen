@@ -317,7 +317,7 @@ export function TradingDashboard() {
     todayOrLastWeekday
   ]);
   const [interval, setInterval] = useState<string>('5m');
-  const [strategy, setStrategy] = useState<string>('macd');
+  const [strategy, setStrategy] = useState<string>('mean_reversion');
   const [days, setDays] = useState<number>(1);
   const [initialCapital, setInitialCapital] = useState<number>(100000);
   const [currentError, setCurrentError] = useState<string | null>(null);

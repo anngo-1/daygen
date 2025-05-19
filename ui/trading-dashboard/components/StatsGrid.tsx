@@ -80,8 +80,9 @@ export function StatsGrid({ data }: StatsGridProps) {
     {
       title: 'Total Trades',
       value: data.trades.length.toString(),
-      description: `${data.trades.filter(t => t.profit_loss > 0).length} profitable trades`,
-      isPositive: data.trades.filter(t => t.profit_loss > 0).length > data.trades.length / 2
+      description: `Total trades executed`, // Removed profitable trades count
+      // isPositive could be based on whether there are any trades, or removed if not meaningful
+      isPositive: data.trades.length > 0 
     },
     {
       title: 'Average P/L per Trade',

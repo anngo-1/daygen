@@ -329,19 +329,20 @@ export function TradingChart({ data }: TradingChartProps) {
         if (point.trade && 
             typeof point.trade === 'object' && 
             point.trade !== null && 
-            typeof point.trade.type === 'string' &&
+            typeof point.trade.type === 'string' && // Keep checking type for structural integrity
+            typeof point.trade.side === 'string' && // Ensure side is a string before use
             typeof point.trade.price === 'number' && // ensure price is also valid for yValue
             typeof point.indicators.portfolio_value === 'number' // ensure portfolio_value is valid for yValue
         ) {
-          const isLong = point.trade.type === 'LONG' || point.trade.type === 'EXIT_SHORT';
+          const isBuySide = point.trade.side === 'BUY'; // Use trade.side for coloring
           const yValue = activeTab === 'price' ? point.price : point.indicators.portfolio_value;
 
           annotations.push({
             type: 'point',
             xValue: index,
             yValue: yValue, // Ensure yValue is valid
-            borderColor: isLong ? 'lime' : 'magenta',
-            backgroundColor: isLong ? 'green' : 'red',
+            borderColor: isBuySide ? 'lime' : 'magenta',
+            backgroundColor: isBuySide ? 'green' : 'red',
             borderWidth: 0,
             pointStyle: 'circle',
             radius: 5,
@@ -351,10 +352,10 @@ export function TradingChart({ data }: TradingChartProps) {
             mode: 'vertical',
             scaleID: 'x',
             value: index,
-            borderColor: isLong ? 'rgba(0, 200, 0, 0.7)' : 'rgba(200, 0, 0, 0.7)',
+            borderColor: isBuySide ? 'rgba(0, 200, 0, 0.7)' : 'rgba(200, 0, 0, 0.7)',
             borderWidth: 1,
             // label: { // Temporarily remove label to isolate the issue
-            //   content: point.trade.type.replace('_', ' '),
+            //   content: point.trade.type.replace('_', ' '), // Label can still use original type for more detail
             //   display: false, 
             // },
           });

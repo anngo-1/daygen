@@ -226,7 +226,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
             double cost = qty * price * (1 + transactionCostRate);
             if (cash >= cost) {
                 cash -= cost;
-                trades.push_back({timeStep, "BUY", price, qty});
+                trades.push_back({timeStep, "BUY (Entry)", price, qty});
                 position += qty;
                 entryPrice = price;
                 std::cout << "DEBUG: " << timestamp << " - INFO: BUY at " << std::fixed << std::setprecision(2) << price << ", qty: " << qty << ", cost: " << std::fixed << std::setprecision(2) << cost << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log BUY info
@@ -246,7 +246,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
         if (position > 0) {
             double proceeds = position * price * (1 - transactionCostRate);
             cash += proceeds;
-            trades.push_back({timeStep, "SELL", price, position});
+            trades.push_back({timeStep, "SELL (Exit Long)", price, position});
             std::cout << "DEBUG: " << timestamp << " - INFO: SELL at " << std::fixed << std::setprecision(2) << price << ", qty: " << position << ", proceeds: " << std::fixed << std::setprecision(2) << proceeds << ", new cash: " << std::fixed << std::setprecision(2) << cash << std::endl; // Log SELL info
             position = 0;
             entryPrice = 0.0;
@@ -273,7 +273,7 @@ void MACDStrategy::onTick(double price, int timeStep, const std::string& tickTim
     }
 
 
-    if (debugDetailTicks && (trades.back().timeStep <= timeStep) && (trades.back().timeStep + 5 < timeStep)) {
+    if (debugDetailTicks && (trades.size() > 0) && (trades.back().timeStep <= timeStep) && (trades.back().timeStep + 5 < timeStep)) {
         debugDetailTicks = false;
     }
      if (timeStep % 10 == 0 || debugDetailTicks) {

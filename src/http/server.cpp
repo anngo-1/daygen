@@ -153,6 +153,7 @@ std::string TradingServer::handleSimulate(const httplib::Request& req, httplib::
 
             if (trade_it != result.trades.end()) {
                 timestepData["trade"] = {
+                    {"type", trade_it->type},
                     {"side", trade_it->side},
                     {"quantity", trade_it->quantity},
                     {"price", trade_it->price}

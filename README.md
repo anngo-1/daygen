@@ -62,6 +62,24 @@ Then install Python packages:
 pip install yfinance pandas
 ```
 
+### Auth
+The backend now enforces a bearer token on all endpoints when `TRADING_API_TOKEN` is set.
+
+- On the backend host, set the environment variable before starting the server:
+```bash
+export TRADING_API_TOKEN="your-long-random-token"
+./trader
+```
+
+- On the frontend (Next.js) deployment, set the same token and the backend URL:
+```bash
+# in ui/trading-dashboard/.env.local (for local dev)
+TRADING_SERVER_URL=http://localhost:18080
+TRADING_API_TOKEN=your-long-random-token
+```
+The Next.js API routes automatically add `Authorization: Bearer <token>` when calling the backend.
+
+
 ### Build & Run
 
 1. Build the backend:
@@ -78,7 +96,7 @@ npm install
 3. Start both servers:
 ```bash
 # terminal 1 - start backend (from project root)
-./trading
+./trader
 
 # terminal 2 - start frontend (from project root)
 cd ui/trading-dashboard

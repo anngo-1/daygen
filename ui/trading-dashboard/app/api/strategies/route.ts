@@ -3,7 +3,11 @@ import axios from 'axios';
 
 export async function GET() {
   try {
-    const response = await axios.get(`${process.env.TRADING_SERVER_URL}/strategies`);
+    const response = await axios.get(`${process.env.TRADING_SERVER_URL}/strategies`, {
+      headers: process.env.TRADING_API_TOKEN
+        ? { Authorization: `Bearer ${process.env.TRADING_API_TOKEN}` }
+        : undefined,
+    });
     return NextResponse.json(response.data);
   } catch (error) {
     console.error('Error fetching strategies:', error);

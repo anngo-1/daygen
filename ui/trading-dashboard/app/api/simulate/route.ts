@@ -9,6 +9,7 @@ interface SimulationParams {
 }
 
 const TRADING_SERVER_URL = process.env.TRADING_SERVER_URL || 'http://localhost:18080';
+const TRADING_API_TOKEN = process.env.TRADING_API_TOKEN;
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...(TRADING_API_TOKEN ? { Authorization: `Bearer ${TRADING_API_TOKEN}` } : {}),
         },
       }
     );
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error:', error);
 
-    if (error instanceof Error && 'code' in error && error.code === 'ECONNREFUSED') {
+    if (error instanceof Error && 'code' in error && (error as any).code === 'ECONNREFUSED') {
       return Response.json(
         { error: 'Trading server is not running. Please start the server first.' },
         { status: 503 }

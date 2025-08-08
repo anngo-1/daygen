@@ -18,6 +18,7 @@ private:
                                httplib::Response& res);
     
     httplib::Server server;
+    std::string authToken_;
 };
 
 } // namespace trading

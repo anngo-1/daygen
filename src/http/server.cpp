@@ -5,10 +5,46 @@
 #include "strategies/random_strategy.h"
 #include <algorithm>
 #include <iostream> 
+#include <cstdlib>
 
 namespace trading {
 
 TradingServer::TradingServer() {
+    const char* envToken = std::getenv("TRADING_API_TOKEN");
+    if (envToken) {
+        authToken_ = envToken;
+    }
+
+    server.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
+
+        if (req.method == "OPTIONS") {
+            res.status = 204;
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Access-Control-Allow-Headers", "Authorization, Content-Type");
+            res.set_header("Access-Control-Allow-Methods", "GET, OPTIONS");
+            return httplib::Server::HandlerResponse::Handled;
+        }
+
+        res.set_header("Access-Control-Allow-Origin", "*");
+
+        if (!authToken_.empty()) {
+            std::string authHeader = req.get_header_value("Authorization");
+            const std::string prefix = "Bearer ";
+            if (authHeader.rfind(prefix, 0) != 0) {
+                res.status = 401;
+                res.set_content("Missing or invalid Authorization header", "text/plain");
+                return httplib::Server::HandlerResponse::Handled;
+            }
+            std::string token = authHeader.substr(prefix.size());
+            if (token != authToken_) {
+                res.status = 403;
+                res.set_content("Forbidden", "text/plain");
+                return httplib::Server::HandlerResponse::Handled;
+            }
+        }
+        return httplib::Server::HandlerResponse::Unhandled;
+    });
+
     server.Get("/simulate", [this](const httplib::Request& req, httplib::Response& res) {
         return handleSimulate(req, res);
     });

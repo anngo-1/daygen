@@ -11,6 +11,8 @@ interface SimulationParams {
 const TRADING_SERVER_URL = process.env.TRADING_SERVER_URL || 'http://localhost:18080';
 const TRADING_API_TOKEN = process.env.TRADING_API_TOKEN;
 
+type ErrorWithCode = Error & { code?: string };
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const params: SimulationParams = {
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const cleanParams = Object.fromEntries(
-      Object.entries(params).filter(([value]) => value !== null)
+      Object.entries(params).filter(([, value]) => value !== null)
     ) as Record<string, string>;
 
     const response = await fetch(
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error:', error);
 
-    if (error instanceof Error && 'code' in error && (error as any).code === 'ECONNREFUSED') {
+    if (error instanceof Error && (error as ErrorWithCode).code === 'ECONNREFUSED') {
       return Response.json(
         { error: 'Trading server is not running. Please start the server first.' },
         { status: 503 }
